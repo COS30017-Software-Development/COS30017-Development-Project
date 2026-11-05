@@ -30,3 +30,28 @@ replay_pid*
 *.pdf
 *.docx
 *.doc
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+~$*
+
+# JetBrains / Android Studio
+.idea/
+*.iml
+.gradle/
+.cxx/
+local.properties
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Visual Studio 2022
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.opendb
