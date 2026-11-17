@@ -1,6 +1,9 @@
 package com.example.cos30017developmentproject
 
 import android.os.Bundle
+import android.text.method.PasswordTransformationMethod
+import android.widget.Checkable
+import com.google.android.material.textfield.TextInputLayout
 import android.view.View
 import android.widget.TextView
 import android.widget.EditText
@@ -38,6 +41,11 @@ class AuthActivity : AppCompatActivity() {
 		})
 		findViewById<View>(R.id.auth_switch).setOnClickListener { showForm(!registering) }
 		findViewById<EditText>(R.id.auth_password).doAfterTextChanged { updatePasswordRequirements() }
+		findViewById<EditText>(R.id.auth_student_id).doAfterTextChanged { text ->
+			findViewById<TextInputLayout>(R.id.auth_student_id_layout).error =
+				if (!text.isNullOrEmpty() && text.length != 9) getString(R.string.auth_student_id_error) else null
+		}
+		setupPasswordVisibility()
 		showForm(savedInstanceState?.getBoolean("auth.registering") ?: false)
 	}
 
@@ -57,6 +65,32 @@ class AuthActivity : AppCompatActivity() {
 		findViewById<TextView>(R.id.auth_submit).setText(if (signUp) R.string.auth_sign_up else R.string.auth_login)
 		findViewById<TextView>(R.id.auth_switch).setText(if (signUp) R.string.auth_login else R.string.auth_sign_up)
 		title = getString(if (signUp) R.string.auth_sign_up else R.string.auth_login)
+	}
+
+	private fun setupPasswordVisibility() {
+		val layouts = listOf(
+			findViewById<TextInputLayout>(R.id.auth_password_layout),
+			findViewById<TextInputLayout>(R.id.auth_confirm_password_layout)
+		)
+		for (layout in layouts) {
+			layout.setEndIconOnClickListener {
+				val showPassword =
+					layout.editText!!.transformationMethod is PasswordTransformationMethod
+				for (passwordLayout in layouts) {
+					val field = passwordLayout.editText!!
+					val selectionStart = field.selectionStart
+					val selectionEnd = field.selectionEnd
+					field.transformationMethod =
+						if (showPassword) null else PasswordTransformationMethod.getInstance()
+					if (selectionStart >= 0 && selectionEnd >= 0) field.setSelection(
+						selectionStart,
+						selectionEnd
+					)
+					(passwordLayout.findViewById<View>(com.google.android.material.R.id.text_input_end_icon) as Checkable)
+						.isChecked = showPassword
+				}
+			}
+		}
 	}
 
 	private fun updatePasswordRequirements() {

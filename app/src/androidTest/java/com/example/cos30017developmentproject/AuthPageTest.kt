@@ -19,12 +19,22 @@ class AuthPageTest {
 	private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
 
 	private fun checkAuth(action: (AuthActivity) -> Unit) {
-		instrumentation.waitForIdleSync()
-		instrumentation.runOnMainSync {
-			val activity = ActivityLifecycleMonitorRegistry.getInstance()
-				.getActivitiesInStage(Stage.RESUMED).filterIsInstance<AuthActivity>().single()
-			action(activity)
+		val deadline = android.os.SystemClock.uptimeMillis() + 5000
+		var checked = false
+		while (!checked && android.os.SystemClock.uptimeMillis() < deadline) {
+			instrumentation.waitForIdleSync()
+			instrumentation.runOnMainSync {
+				val activity = ActivityLifecycleMonitorRegistry.getInstance()
+					.getActivitiesInStage(Stage.RESUMED).filterIsInstance<AuthActivity>()
+					.singleOrNull()
+				if (activity != null) {
+					action(activity)
+					checked = true
+				}
+			}
+			if (!checked) android.os.SystemClock.sleep(50)
 		}
+		assertTrue("Login activity should reach the resumed state", checked)
 	}
 
 	@Test
@@ -137,6 +147,55 @@ class AuthPageTest {
 				rules.forEach { assertEquals(expected(R.color.text_secondary), color(it)) }
 				activity.findViewById<View>(R.id.auth_switch).performClick()
 				assertEquals(View.GONE, requirements.visibility)
+			}
+		}
+	}
+
+	@Test
+	fun studentIdFiltersNonDigitsAndPasswordVisibilityStaysInSync() {
+		ActivityScenario.launch(AuthActivity::class.java).use { scenario ->
+			scenario.onActivity { activity ->
+				activity.findViewById<View>(R.id.auth_switch).performClick()
+				val studentId = activity.findViewById<EditText>(R.id.auth_student_id)
+				studentId.text.replace(0, 0, "0a12-3 4!5")
+				assertEquals("012345", studentId.text.toString())
+				val studentLayout =
+					activity.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.auth_student_id_layout)
+				assertEquals(
+					activity.getString(R.string.auth_student_id_error),
+					studentLayout.error
+				)
+				studentId.text.replace(0, studentId.length(), "012345678")
+				assertNull(studentLayout.error)
+				studentId.text.append("9")
+				assertEquals("0123456789", studentId.text.toString())
+				assertEquals(
+					activity.getString(R.string.auth_student_id_error),
+					studentLayout.error
+				)
+				assertFalse(activity.findViewById<View>(R.id.auth_submit).isEnabled)
+				studentId.text.delete(9, 10)
+				assertNull(studentLayout.error)
+
+				val password = activity.findViewById<EditText>(R.id.auth_password)
+				val confirmation = activity.findViewById<EditText>(R.id.auth_confirm_password)
+				password.setText("Aa1!abcd")
+				confirmation.setText("Aa1!abcd")
+				password.setSelection(3)
+				for (layoutId in listOf(
+					R.id.auth_password_layout,
+					R.id.auth_confirm_password_layout
+				)) {
+					val icon = activity.findViewById<View>(layoutId)
+						.findViewById<View>(com.google.android.material.R.id.text_input_end_icon)
+					icon.performClick()
+					assertNull(password.transformationMethod)
+					assertNull(confirmation.transformationMethod)
+					assertEquals(3, password.selectionStart)
+					icon.performClick()
+					assertTrue(password.transformationMethod is android.text.method.PasswordTransformationMethod)
+					assertTrue(confirmation.transformationMethod is android.text.method.PasswordTransformationMethod)
+				}
 			}
 		}
 	}

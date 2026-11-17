@@ -72,4 +72,5 @@ Bring it home.</string>
 	<string name="password_requirement_special">• At least one special character</string>
 	<string name="password_requirement_uppercase">• At least one uppercase letter</string>
 	<string name="password_requirement_lowercase">• At least one lowercase letter</string>
+	<string name="auth_student_id_error">Student ID must contain exactly 9 digits.</string>
 </resources>

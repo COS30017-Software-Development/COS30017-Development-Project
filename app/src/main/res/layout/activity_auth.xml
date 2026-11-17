@@ -119,9 +119,10 @@
 					android:id="@+id/auth_student_id"
 					android:layout_width="match_parent"
 					android:layout_height="wrap_content"
+					android:digits="0123456789"
 					android:imeOptions="actionNext"
 					android:importantForAutofill="no"
-					android:inputType="text"
+					android:inputType="number"
 					android:minHeight="56dp"
 					android:saveEnabled="false"
 					android:singleLine="true" />
