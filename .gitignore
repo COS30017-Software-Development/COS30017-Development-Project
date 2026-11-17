@@ -56,7 +56,43 @@ local.properties
 *.VC.db
 *.VC.opendb
 
-# Agents local settings
+# Agent local settings, instructions, and personal memory
+# Codex
 .codex/
+.codex-home/
+
+# Claude Code
 .claude/
+.claude-home/
+
+# GitHub Copilot
+.copilot/
+.github/copilot-instructions.md
+.github/instructions/
+.github/agents/
+.github/prompts/
+
+# DeepSeek and local harness state
+.deepseek/
+.deepseek-home/
+.deepseek-harness/
+.deepseek_harness/
+.harness/
+
+# Shared agent settings and memory directories
+.agent/
+.agents/
+.serena/
+
+# Agent instruction and memory files at any directory level
 *AGENTS.md
+[Aa][Gg][Ee][Nn][Tt][Ss].md
+[Aa][Gg][Ee][Nn][Tt][Ss].local.md
+[Cc][Ll][Aa][Uu][Dd][Ee].md
+[Cc][Ll][Aa][Uu][Dd][Ee].local.md
+[Cc][Oo][Pp][Ii][Ll][Oo][Tt].md
+copilot-instructions.md
+[Dd][Ee][Ee][Pp][Ss][Ee][Ee][Kk].md
+[Dd][Ee][Ee][Pp][Ss][Ee][Ee][Kk].local.md
+[Mm][Ee][Mm][Oo][Rr][Yy].md
+[Mm][Ee][Mm][Oo][Rr][Yy].local.md
