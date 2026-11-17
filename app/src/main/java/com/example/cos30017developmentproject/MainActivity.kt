@@ -36,6 +36,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         drawer = findViewById(R.id.main)
         bottomNavigation = findViewById(R.id.bottom_navigation)
+        bottomNavigation.isItemActiveIndicatorEnabled = false
         sideNavigation = findViewById(R.id.side_navigation)
         itemsPage = ItemsPage(findViewById(R.id.items_page), window, savedInstanceState)
         ViewCompat.setOnApplyWindowInsetsListener(drawer) { _, insets ->
@@ -112,6 +113,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.home_scroll).isVisible = !showItems
         findViewById<View>(R.id.items_page).isVisible = showItems
         sideNavigation.menu.findItem(R.id.drawer_home).isChecked = !showItems
+        if (!showItems) sideNavigation.setCheckedItem(R.id.drawer_home)
         WindowCompat.getInsetsController(window, drawer).hide(WindowInsetsCompat.Type.ime())
         currentFocus?.clearFocus()
         updateBackCallback()

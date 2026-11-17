@@ -7,6 +7,7 @@
 	android:background="@color/white"
 	android:fitsSystemWindows="false"
 	app:headerLayout="@layout/component_drawer_header"
+	app:itemBackground="@drawable/bg_navigation_item"
 	app:itemIconPadding="24dp"
 	app:itemIconTint="@color/navigation_colors"
 	app:itemTextColor="@color/navigation_colors"
