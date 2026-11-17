@@ -3,6 +3,9 @@ package com.example.cos30017developmentproject
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
+import android.widget.EditText
+import androidx.core.content.ContextCompat
+import androidx.core.widget.doAfterTextChanged
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -34,6 +37,7 @@ class AuthActivity : AppCompatActivity() {
 			}
 		})
 		findViewById<View>(R.id.auth_switch).setOnClickListener { showForm(!registering) }
+		findViewById<EditText>(R.id.auth_password).doAfterTextChanged { updatePasswordRequirements() }
 		showForm(savedInstanceState?.getBoolean("auth.registering") ?: false)
 	}
 
@@ -44,6 +48,8 @@ class AuthActivity : AppCompatActivity() {
 
 	private fun showForm(signUp: Boolean) {
 		registering = signUp
+		findViewById<View>(R.id.auth_password_requirements).isVisible = signUp
+		updatePasswordRequirements()
 		findViewById<View>(R.id.auth_name_layout).isVisible = signUp
 		findViewById<View>(R.id.auth_student_id_layout).isVisible = signUp
 		findViewById<View>(R.id.auth_confirm_password_layout).isVisible = signUp
@@ -52,4 +58,24 @@ class AuthActivity : AppCompatActivity() {
 		findViewById<TextView>(R.id.auth_switch).setText(if (signUp) R.string.auth_login else R.string.auth_sign_up)
 		title = getString(if (signUp) R.string.auth_sign_up else R.string.auth_login)
 	}
+
+	private fun updatePasswordRequirements() {
+		val password = findViewById<EditText>(R.id.auth_password).text.toString()
+		val requirements = listOf(
+			R.id.password_requirement_length to (password.length in 8..16),
+			R.id.password_requirement_digit to password.any { it in '0'..'9' },
+			R.id.password_requirement_special to password.any { !it.isLetterOrDigit() && !it.isWhitespace() },
+			R.id.password_requirement_uppercase to password.any { it.isUpperCase() },
+			R.id.password_requirement_lowercase to password.any { it.isLowerCase() }
+		)
+		for ((id, met) in requirements) {
+			val color = when {
+				password.isEmpty() -> R.color.text_secondary
+				met -> R.color.password_requirement_met
+				else -> R.color.brand_red_accessible
+			}
+			findViewById<TextView>(id).setTextColor(ContextCompat.getColor(this, color))
+		}
+	}
+
 }

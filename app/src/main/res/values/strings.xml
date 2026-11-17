@@ -59,12 +59,17 @@ Bring it home.</string>
 	<string name="sample_locker_keys_description">Lost near the study area. A small set of keys with a red ring.</string>
 	<string name="auth_login">Login</string>
 	<string name="auth_sign_up">Sign up</string>
-	<string name="auth_login_title">Welcome back.</string>
-	<string name="auth_register_title">Create account.</string>
+	<string name="auth_login_title">Login</string>
+	<string name="auth_register_title">Sign up</string>
 	<string name="auth_name">Name</string>
 	<string name="auth_student_id">Student ID</string>
 	<string name="auth_email">Email</string>
 	<string name="auth_password">Password</string>
 	<string name="auth_confirm_password">Confirm password</string>
 	<string name="auth_back_home">Back to home</string>
+	<string name="password_requirement_length">• 8–16 characters</string>
+	<string name="password_requirement_digit">• At least one number</string>
+	<string name="password_requirement_special">• At least one special character</string>
+	<string name="password_requirement_uppercase">• At least one uppercase letter</string>
+	<string name="password_requirement_lowercase">• At least one lowercase letter</string>
 </resources>

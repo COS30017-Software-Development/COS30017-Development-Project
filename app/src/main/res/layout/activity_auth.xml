@@ -39,9 +39,8 @@
 			<LinearLayout
 				android:layout_width="match_parent"
 				android:layout_height="wrap_content"
-				android:background="@color/black"
 				android:orientation="vertical"
-				android:padding="24dp">
+				android:paddingBottom="8dp">
 
 				<TextView
 					android:layout_width="match_parent"
@@ -49,7 +48,7 @@
 					android:fontFamily="sans-serif-black"
 					android:letterSpacing="0.08"
 					android:text="@string/brand_name"
-					android:textColor="@color/white"
+					android:textColor="@color/black"
 					android:textSize="24sp" />
 
 				<TextView
@@ -58,7 +57,7 @@
 					android:layout_marginTop="4dp"
 					android:letterSpacing="0.16"
 					android:text="@string/brand_subtitle"
-					android:textColor="@color/white"
+					android:textColor="@color/black"
 					android:textSize="11sp" />
 
 				<View
@@ -74,7 +73,7 @@
 					android:layout_marginTop="16dp"
 					android:fontFamily="sans-serif-black"
 					android:text="@string/auth_login_title"
-					android:textColor="@color/white"
+					android:textColor="@color/black"
 					android:textSize="32sp" />
 			</LinearLayout>
 
@@ -177,6 +176,60 @@
 					android:saveEnabled="false"
 					android:singleLine="true" />
 			</com.google.android.material.textfield.TextInputLayout>
+
+			<LinearLayout
+				android:id="@+id/auth_password_requirements"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="8dp"
+				android:orientation="vertical"
+				android:visibility="gone">
+
+				<TextView
+					android:id="@+id/password_requirement_length"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:paddingTop="4dp"
+					android:text="@string/password_requirement_length"
+					android:textColor="@color/text_secondary"
+					android:textSize="12sp" />
+
+				<TextView
+					android:id="@+id/password_requirement_digit"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:paddingTop="4dp"
+					android:text="@string/password_requirement_digit"
+					android:textColor="@color/text_secondary"
+					android:textSize="12sp" />
+
+				<TextView
+					android:id="@+id/password_requirement_special"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:paddingTop="4dp"
+					android:text="@string/password_requirement_special"
+					android:textColor="@color/text_secondary"
+					android:textSize="12sp" />
+
+				<TextView
+					android:id="@+id/password_requirement_uppercase"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:paddingTop="4dp"
+					android:text="@string/password_requirement_uppercase"
+					android:textColor="@color/text_secondary"
+					android:textSize="12sp" />
+
+				<TextView
+					android:id="@+id/password_requirement_lowercase"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:paddingTop="4dp"
+					android:text="@string/password_requirement_lowercase"
+					android:textColor="@color/text_secondary"
+					android:textSize="12sp" />
+			</LinearLayout>
 
 			<com.google.android.material.textfield.TextInputLayout
 				android:id="@+id/auth_confirm_password_layout"

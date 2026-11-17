@@ -7,4 +7,5 @@
 	<color name="text_secondary">#626262</color>
 	<color name="outline_soft">#E5E5E5</color>
 	<color name="red_soft">#FFF0F1</color>
+	<color name="password_requirement_met">#00838F</color>
 </resources>
