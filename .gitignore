@@ -23,6 +23,18 @@
 hs_err_pid*
 replay_pid*
 
+# Gradle / Android generated build outputs and configuration caches
+build/
+configuration-cache/
+.configuration-cache/
+.externalNativeBuild/
+captures/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.hprof
+
 # Kotlin Gradle plugin data, see https://kotlinlang.org/docs/whatsnew20.html#new-directory-for-kotlin-data-in-gradle-projects
 .kotlin/
 
