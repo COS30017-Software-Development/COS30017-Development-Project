@@ -1,3 +1,32 @@
 <resources>
-	<string name="app_name">COS30017 Development Project</string>
+	<string name="app_name">Campus Lost &amp; Found</string>
+	<string name="brand_name">CAMPUS</string>
+	<string name="brand_subtitle">LOST &amp; FOUND</string>
+	<string name="open_menu">Open navigation menu</string>
+	<string name="home">Home</string>
+	<string name="items">Items</string>
+	<string name="post">Post</string>
+	<string name="profile">Profile</string>
+	<string name="lost">Lost</string>
+	<string name="found">Found</string>
+	<string name="search">Search</string>
+	<string name="student_space">YOUR CAMPUS. YOUR COMMUNITY.</string>
+	<string name="home_headline">Find it.
+Bring it home.</string>
+	<string name="home_description">A little help goes a long way. Find lost belongings and reconnect them with their owners.</string>
+	<string name="search_hint">Search lost and found items</string>
+	<string name="recent_items">Around campus</string>
+	<string name="sample_notice">Sample items · Style preview</string>
+	<string name="drawer_title">Campus Lost &amp; Found</string>
+	<string name="drawer_subtitle">STUDENT SPACE</string>
+	<string name="preview_message">%1$s will be available in a later update.</string>
+	<string name="sample_backpack_title">Black backpack</string>
+	<string name="sample_backpack_description">Found near the library entrance. Black backpack with a front zip pocket.</string>
+	<string name="sample_bottle_title">Water bottle</string>
+	<string name="sample_bottle_description">Lost in a lecture room. A reusable bottle with a black lid.</string>
+	<string name="sample_headphones_title">Headphones</string>
+	<string name="sample_headphones_description">Found in a campus study area. Black over-ear headphones.</string>
+	<string name="sample_keys_title">Set of keys</string>
+	<string name="sample_keys_description">Lost on campus. Two keys attached to a red key ring.</string>
+	<string name="item_image_description">Sample illustration of %1$s</string>
 </resources>
