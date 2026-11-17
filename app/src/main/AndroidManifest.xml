@@ -11,6 +11,7 @@
 		android:roundIcon="@mipmap/ic_launcher_round"
 		android:supportsRtl="true"
 		android:theme="@style/Theme.COS30017DevelopmentProject">
+		<activity android:name=".AuthActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
 		<activity
 			android:name=".MainActivity"
 			android:exported="true"

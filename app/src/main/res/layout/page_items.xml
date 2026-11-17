@@ -1,70 +1,84 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/items_page"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:visibility="gone">
-    <include android:id="@+id/items_search" layout="@layout/component_search_bar" />
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="18dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="24dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="12dp">
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
-            <TextView
-                style="@style/Campus.SectionTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/all_items" />
-            <TextView
-                android:id="@+id/items_result_count"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:accessibilityLiveRegion="polite"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp" />
-        </LinearLayout>
-        <ImageButton
-            android:id="@+id/toggle_item_layout"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/switch_to_list"
-            android:src="@drawable/ic_view_list"
-            app:tint="@color/brand_red_accessible" />
-    </LinearLayout>
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/items_list"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:paddingHorizontal="14dp"
-            android:paddingBottom="12dp" />
-        <TextView
-            android:id="@+id/items_empty"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:padding="24dp"
-            android:text="@string/no_items_found"
-            android:textColor="@color/text_secondary"
-            android:textSize="16sp"
-            android:visibility="gone" />
-    </FrameLayout>
-    <include android:id="@+id/items_pagination" layout="@layout/component_pagination" />
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:id="@+id/items_page"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:orientation="vertical"
+	android:visibility="gone">
+
+	<include
+		android:id="@+id/items_search"
+		layout="@layout/component_search_bar" />
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginTop="18dp"
+		android:gravity="center_vertical"
+		android:orientation="horizontal"
+		android:paddingStart="24dp"
+		android:paddingEnd="16dp"
+		android:paddingBottom="12dp">
+
+		<LinearLayout
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:orientation="vertical">
+
+			<TextView
+				style="@style/Campus.SectionTitle"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:text="@string/all_items" />
+
+			<TextView
+				android:id="@+id/items_result_count"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="6dp"
+				android:accessibilityLiveRegion="polite"
+				android:textColor="@color/text_secondary"
+				android:textSize="12sp" />
+		</LinearLayout>
+
+		<ImageButton
+			android:id="@+id/toggle_item_layout"
+			android:layout_width="48dp"
+			android:layout_height="48dp"
+			android:background="?attr/selectableItemBackgroundBorderless"
+			android:contentDescription="@string/switch_to_list"
+			android:src="@drawable/ic_view_list"
+			app:tint="@color/brand_red_accessible" />
+	</LinearLayout>
+
+	<FrameLayout
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1">
+
+		<androidx.recyclerview.widget.RecyclerView
+			android:id="@+id/items_list"
+			android:layout_width="match_parent"
+			android:layout_height="match_parent"
+			android:clipToPadding="false"
+			android:paddingHorizontal="14dp"
+			android:paddingBottom="12dp" />
+
+		<TextView
+			android:id="@+id/items_empty"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_gravity="center"
+			android:gravity="center"
+			android:padding="24dp"
+			android:text="@string/no_items_found"
+			android:textColor="@color/text_secondary"
+			android:textSize="16sp"
+			android:visibility="gone" />
+	</FrameLayout>
+
+	<include
+		android:id="@+id/items_pagination"
+		layout="@layout/component_pagination" />
 </LinearLayout>
