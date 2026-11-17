@@ -5,63 +5,69 @@
 	android:background="@color/white">
 
 	<LinearLayout
+		android:id="@+id/main_content"
 		android:layout_width="match_parent"
 		android:layout_height="match_parent"
 		android:orientation="vertical">
 
 		<include layout="@layout/component_home_toolbar" />
 
-		<androidx.core.widget.NestedScrollView
-			android:id="@+id/home_scroll"
+		<FrameLayout
 			android:layout_width="match_parent"
 			android:layout_height="0dp"
-			android:layout_weight="1"
-			android:clipToPadding="false"
-			android:fillViewport="true">
-
-			<LinearLayout
+			android:layout_weight="1">
+			<androidx.core.widget.NestedScrollView
+				android:id="@+id/home_scroll"
 				android:layout_width="match_parent"
-				android:layout_height="wrap_content"
-				android:orientation="vertical"
-				android:paddingBottom="20dp">
-
-				<include layout="@layout/component_home_intro" />
-
-				<include layout="@layout/component_search_bar" />
+				android:layout_height="match_parent"
+				android:clipToPadding="false"
+				android:fillViewport="true">
 
 				<LinearLayout
 					android:layout_width="match_parent"
 					android:layout_height="wrap_content"
 					android:orientation="vertical"
-					android:paddingStart="24dp"
-					android:paddingTop="28dp"
-					android:paddingEnd="24dp"
-					android:paddingBottom="12dp">
+					android:paddingBottom="20dp">
 
-					<TextView
-						style="@style/Campus.SectionTitle"
+					<include layout="@layout/component_home_intro" />
+
+					<include layout="@layout/component_search_bar" />
+
+					<LinearLayout
 						android:layout_width="match_parent"
 						android:layout_height="wrap_content"
-						android:text="@string/recent_items" />
+						android:orientation="vertical"
+						android:paddingStart="24dp"
+						android:paddingTop="28dp"
+						android:paddingEnd="24dp"
+						android:paddingBottom="12dp">
 
-					<TextView
+						<TextView
+							style="@style/Campus.SectionTitle"
+							android:layout_width="match_parent"
+							android:layout_height="wrap_content"
+							android:text="@string/recent_items" />
+
+						<TextView
+							android:layout_width="match_parent"
+							android:layout_height="wrap_content"
+							android:layout_marginTop="6dp"
+							android:text="@string/sample_notice"
+							android:textColor="@color/text_secondary"
+							android:textSize="12sp" />
+					</LinearLayout>
+
+					<androidx.recyclerview.widget.RecyclerView
+						android:id="@+id/item_list"
 						android:layout_width="match_parent"
 						android:layout_height="wrap_content"
-						android:layout_marginTop="6dp"
-						android:text="@string/sample_notice"
-						android:textColor="@color/text_secondary"
-						android:textSize="12sp" />
+						android:nestedScrollingEnabled="false"
+						android:paddingStart="14dp"
+						android:paddingEnd="14dp" />
 				</LinearLayout>
-
-				<androidx.recyclerview.widget.RecyclerView
-					android:id="@+id/item_list"
-					android:layout_width="match_parent"
-					android:layout_height="wrap_content"
-					android:nestedScrollingEnabled="false"
-					android:paddingStart="14dp"
-					android:paddingEnd="14dp" />
-			</LinearLayout>
-		</androidx.core.widget.NestedScrollView>
+			</androidx.core.widget.NestedScrollView>
+			<include layout="@layout/page_items" />
+		</FrameLayout>
 
 		<View
 			android:layout_width="match_parent"
