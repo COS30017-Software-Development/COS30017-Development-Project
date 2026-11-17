@@ -55,3 +55,8 @@ local.properties
 *.sln.docstates
 *.VC.db
 *.VC.opendb
+
+# Agents local settings
+.codex/
+.claude/
+*AGENTS.md
