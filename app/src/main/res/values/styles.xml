@@ -9,4 +9,7 @@
 	<style name="Campus.NavigationIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
 		<item name="android:color">@color/red_soft</item>
 	</style>
+    <style name="Campus.NavigationLabel" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textSize">12sp</item>
+    </style>
 </resources>
