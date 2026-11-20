@@ -41,10 +41,8 @@ class MainActivity : AppCompatActivity() {
 		sideNavigation = findViewById(R.id.side_navigation)
 		itemsPage = ItemsPage(findViewById(R.id.items_page), window, savedInstanceState)
 		ViewCompat.setOnApplyWindowInsetsListener(drawer) { _, insets ->
-			val bars =
-				insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-			val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime())
-			// DrawerLayout lays out children without respecting its own padding.
+			val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+			val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime())            // DrawerLayout lays out children without respecting its own padding.
 			findViewById<View>(R.id.main_content).setPadding(
 				bars.left, bars.top, bars.right, maxOf(bars.bottom, keyboard.bottom)
 			)
@@ -56,8 +54,7 @@ class MainActivity : AppCompatActivity() {
 		findViewById<RecyclerView>(R.id.item_list).apply {
 			val config = resources.configuration
 			layoutManager = GridLayoutManager(
-				context,
-				if (config.screenWidthDp >= 360 && config.fontScale <= 1.3f) 2 else 1
+				context, if (config.screenWidthDp >= 360 && config.fontScale <= 1.3f) 2 else 1
 			)
 			adapter = ItemCardAdapter(SampleItem.examples.take(4))
 		}
@@ -121,8 +118,7 @@ class MainActivity : AppCompatActivity() {
 			} else showPreviewMessage(item.title.toString())
 			false
 		}
-		bottomNavigation.selectedItemId =
-			savedInstanceState?.getInt("navigation.page") ?: R.id.nav_home
+		bottomNavigation.selectedItemId = savedInstanceState?.getInt("navigation.page") ?: R.id.nav_home
 		drawer.closeDrawer(GravityCompat.START, false)
 	}
 
@@ -143,16 +139,14 @@ class MainActivity : AppCompatActivity() {
 	}
 
 	private fun updateBackCallback() {
-		backCallback.isEnabled =
-			drawer.isDrawerOpen(GravityCompat.START) || findViewById<View>(R.id.items_page).isVisible
+		backCallback.isEnabled = drawer.isDrawerOpen(GravityCompat.START) || findViewById<View>(R.id.items_page).isVisible
 	}
 
 	private fun scrollHomeToTop() {
 		findViewById<NestedScrollView>(R.id.home_scroll).smoothScrollTo(0, 0)
 	}
 
-	private fun openLogin() {
-		// Authentication is not connected yet; protected entries open the login UI.
+	private fun openLogin() {        // Authentication is not connected yet; protected entries open the login UI.
 		bottomNavigation.selectedItemId = R.id.nav_home
 		startActivity(Intent(this, AuthActivity::class.java))
 	}

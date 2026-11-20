@@ -1,12 +1,12 @@
-<resources>
+<resources >
 
-	<style name="Campus.SectionTitle" parent="">
-		<item name="android:textSize">22sp</item>
-		<item name="android:textColor">@color/black</item>
-		<item name="android:fontFamily">sans-serif-medium</item>
-	</style>
+	<style name = "Campus.SectionTitle" parent = "" >
+		<item name = "android:textSize" >22sp</item >
+		<item name = "android:textColor" >@color/black</item >
+		<item name = "android:fontFamily" >sans-serif-medium</item >
+	</style >
 
-	<style name="Campus.NavigationLabel" parent="TextAppearance.Material3.LabelMedium">
-		<item name="android:textSize">12sp</item>
-	</style>
-</resources>
+	<style name = "Campus.NavigationLabel" parent = "TextAppearance.Material3.LabelMedium" >
+		<item name = "android:textSize" >12sp</item >
+	</style >
+</resources >

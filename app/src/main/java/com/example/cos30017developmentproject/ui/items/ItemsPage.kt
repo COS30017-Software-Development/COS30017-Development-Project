@@ -76,18 +76,15 @@ class ItemsPage(private val view: View, window: Window, savedState: Bundle?) {
 	private fun render() {
 		val context = view.context
 		val config = context.resources.configuration
-		layout.spanCount =
-			if (listMode || config.screenWidthDp < 360 || config.fontScale > 1.3f) 1 else 2
+		layout.spanCount = if (listMode || config.screenWidthDp < 360 || config.fontScale > 1.3f) 1 else 2
 		adapter.setListMode(listMode)
 		adapter.submitList(pagination.visibleItems)
 		list.scrollToPosition(0)
 		toggle.setImageResource(if (listMode) R.drawable.ic_view_grid else R.drawable.ic_view_list)
-		toggle.contentDescription =
-			context.getString(if (listMode) R.string.switch_to_grid else R.string.switch_to_list)
-		view.findViewById<TextView>(R.id.items_result_count).text =
-			context.resources.getQuantityString(
-				R.plurals.sample_item_count, pagination.resultCount, pagination.resultCount
-			)
+		toggle.contentDescription = context.getString(if (listMode) R.string.switch_to_grid else R.string.switch_to_list)
+		view.findViewById<TextView>(R.id.items_result_count).text = context.resources.getQuantityString(
+			R.plurals.sample_item_count, pagination.resultCount, pagination.resultCount
+		)
 		view.findViewById<TextView>(R.id.page_label).text = context.getString(
 			R.string.page_label, pagination.pageIndex + 1, pagination.pageCount
 		)

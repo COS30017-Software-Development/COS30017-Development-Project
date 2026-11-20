@@ -10,7 +10,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import com.google.android.material.navigation.NavigationView
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -40,10 +43,7 @@ class AuthPageTest {
 	@Test
 	fun protectedEntriesOpenLoginAndBackReturnsHome() {
 		for (entry in listOf(
-			R.id.nav_profile,
-			R.id.nav_post,
-			R.id.drawer_profile,
-			R.id.drawer_post
+			R.id.nav_profile, R.id.nav_post, R.id.drawer_profile, R.id.drawer_post
 		)) {
 			ActivityScenario.launch(MainActivity::class.java).use { scenario ->
 				scenario.onActivity { main ->
@@ -91,8 +91,7 @@ class AuthPageTest {
 				assertFalse(it.findViewById<View>(R.id.auth_submit).isEnabled)
 				it.findViewById<View>(R.id.auth_switch).performClick()
 				assertEquals(
-					View.GONE,
-					it.findViewById<View>(R.id.auth_confirm_password_layout).visibility
+					View.GONE, it.findViewById<View>(R.id.auth_confirm_password_layout).visibility
 				)
 			}
 		}
@@ -105,8 +104,10 @@ class AuthPageTest {
 				val requirements = activity.findViewById<View>(R.id.auth_password_requirements)
 				val password = activity.findViewById<EditText>(R.id.auth_password)
 				val rules = listOf(
-					R.id.password_requirement_length, R.id.password_requirement_digit,
-					R.id.password_requirement_special, R.id.password_requirement_uppercase,
+					R.id.password_requirement_length,
+					R.id.password_requirement_digit,
+					R.id.password_requirement_special,
+					R.id.password_requirement_uppercase,
 					R.id.password_requirement_lowercase
 				)
 
@@ -128,20 +129,17 @@ class AuthPageTest {
 					password.setText(value)
 					rules.forEach {
 						assertEquals(
-							expected(R.color.password_requirement_met),
-							color(it)
+							expected(R.color.password_requirement_met), color(it)
 						)
 					}
 				}
 				password.setText("Aa1!abcdefghijklM")
 				assertEquals(
-					expected(R.color.brand_red_accessible),
-					color(R.id.password_requirement_length)
+					expected(R.color.brand_red_accessible), color(R.id.password_requirement_length)
 				)
 				password.setText("Aa1 abcdef")
 				assertEquals(
-					expected(R.color.brand_red_accessible),
-					color(R.id.password_requirement_special)
+					expected(R.color.brand_red_accessible), color(R.id.password_requirement_special)
 				)
 				password.setText("")
 				rules.forEach { assertEquals(expected(R.color.text_secondary), color(it)) }
@@ -159,19 +157,18 @@ class AuthPageTest {
 				val studentId = activity.findViewById<EditText>(R.id.auth_student_id)
 				studentId.text.replace(0, 0, "0a12-3 4!5")
 				assertEquals("012345", studentId.text.toString())
-				val studentLayout =
-					activity.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.auth_student_id_layout)
+				val studentLayout = activity.findViewById<com.google.android.material.textfield.TextInputLayout>(
+					R.id.auth_student_id_layout
+				)
 				assertEquals(
-					activity.getString(R.string.auth_student_id_error),
-					studentLayout.error
+					activity.getString(R.string.auth_student_id_error), studentLayout.error
 				)
 				studentId.text.replace(0, studentId.length(), "012345678")
 				assertNull(studentLayout.error)
 				studentId.text.append("9")
 				assertEquals("0123456789", studentId.text.toString())
 				assertEquals(
-					activity.getString(R.string.auth_student_id_error),
-					studentLayout.error
+					activity.getString(R.string.auth_student_id_error), studentLayout.error
 				)
 				assertFalse(activity.findViewById<View>(R.id.auth_submit).isEnabled)
 				studentId.text.delete(9, 10)
@@ -183,8 +180,7 @@ class AuthPageTest {
 				confirmation.setText("Aa1!abcd")
 				password.setSelection(3)
 				for (layoutId in listOf(
-					R.id.auth_password_layout,
-					R.id.auth_confirm_password_layout
+					R.id.auth_password_layout, R.id.auth_confirm_password_layout
 				)) {
 					val icon = activity.findViewById<View>(layoutId)
 						.findViewById<View>(com.google.android.material.R.id.text_input_end_icon)

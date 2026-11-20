@@ -42,28 +42,30 @@ class ItemCardAdapter(items: List<SampleItem> = emptyList()) :
 					orientation = LinearLayout.HORIZONTAL
 					minimumHeight = (132 * density).toInt()
 				}
-				view.findViewById<View>(R.id.item_image_container).layoutParams =
-					LinearLayout.LayoutParams(
-						(112 * density).toInt(),
-						ViewGroup.LayoutParams.MATCH_PARENT
-					)
-				view.findViewById<View>(R.id.item_text_container).layoutParams =
-					LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+				view.findViewById<View>(R.id.item_image_container).layoutParams = LinearLayout.LayoutParams(
+					(112 * density).toInt(), ViewGroup.LayoutParams.MATCH_PARENT
+				)
+				view.findViewById<View>(R.id.item_text_container).layoutParams = LinearLayout.LayoutParams(
+					0,
+					ViewGroup.LayoutParams.WRAP_CONTENT,
+					1f
+				)
 			}
 		}
 
 		fun bind(item: SampleItem) {
 			val context = itemView.context
 			image.setImageResource(item.image)
-			image.contentDescription =
-				context.getString(R.string.item_image_description, context.getString(item.title))
+			image.contentDescription = context.getString(
+				R.string.item_image_description,
+				context.getString(item.title)
+			)
 			title.setText(item.title)
 			description.setText(item.description)
 			type.setText(if (item.isFound) R.string.found else R.string.lost)
 			type.setTextColor(
 				ContextCompat.getColor(
-					context,
-					if (item.isFound) R.color.black else R.color.brand_red_accessible
+					context, if (item.isFound) R.color.black else R.color.brand_red_accessible
 				)
 			)
 		}
@@ -74,8 +76,11 @@ class ItemCardAdapter(items: List<SampleItem> = emptyList()) :
 		viewType == 1
 	)
 
-	override fun onBindViewHolder(holder: ItemViewHolder, position: Int) =
-		holder.bind(getItem(position))
+	override fun onBindViewHolder(holder: ItemViewHolder, position: Int) = holder.bind(
+		getItem(
+			position
+		)
+	)
 
 	private object ItemDiff : DiffUtil.ItemCallback<SampleItem>() {
 		override fun areItemsTheSame(old: SampleItem, new: SampleItem) = old.title == new.title

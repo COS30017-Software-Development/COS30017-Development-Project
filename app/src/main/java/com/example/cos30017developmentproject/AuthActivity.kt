@@ -2,19 +2,19 @@ package com.example.cos30017developmentproject
 
 import android.os.Bundle
 import android.text.method.PasswordTransformationMethod
-import android.widget.Checkable
-import com.google.android.material.textfield.TextInputLayout
 import android.view.View
-import android.widget.TextView
+import android.widget.Checkable
 import android.widget.EditText
-import androidx.core.content.ContextCompat
-import androidx.core.widget.doAfterTextChanged
+import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
+import com.google.android.material.textfield.TextInputLayout
 
 class AuthActivity : AppCompatActivity() {
 	private var registering = false
@@ -26,8 +26,7 @@ class AuthActivity : AppCompatActivity() {
 		ViewCompat.setAccessibilityHeading(findViewById(R.id.auth_title), true)
 		val page = findViewById<View>(R.id.auth_page)
 		ViewCompat.setOnApplyWindowInsetsListener(page) { view, insets ->
-			val bars =
-				insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+			val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
 			val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime())
 			view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, keyboard.bottom))
 			WindowInsetsCompat.CONSUMED
@@ -42,8 +41,9 @@ class AuthActivity : AppCompatActivity() {
 		findViewById<View>(R.id.auth_switch).setOnClickListener { showForm(!registering) }
 		findViewById<EditText>(R.id.auth_password).doAfterTextChanged { updatePasswordRequirements() }
 		findViewById<EditText>(R.id.auth_student_id).doAfterTextChanged { text ->
-			findViewById<TextInputLayout>(R.id.auth_student_id_layout).error =
-				if (!text.isNullOrEmpty() && text.length != 9) getString(R.string.auth_student_id_error) else null
+			findViewById<TextInputLayout>(R.id.auth_student_id_layout).error = if (!text.isNullOrEmpty() && text.length != 9) getString(
+				R.string.auth_student_id_error
+			) else null
 		}
 		setupPasswordVisibility()
 		showForm(savedInstanceState?.getBoolean("auth.registering") ?: false)
@@ -74,20 +74,16 @@ class AuthActivity : AppCompatActivity() {
 		)
 		for (layout in layouts) {
 			layout.setEndIconOnClickListener {
-				val showPassword =
-					layout.editText!!.transformationMethod is PasswordTransformationMethod
+				val showPassword = layout.editText!!.transformationMethod is PasswordTransformationMethod
 				for (passwordLayout in layouts) {
 					val field = passwordLayout.editText!!
 					val selectionStart = field.selectionStart
 					val selectionEnd = field.selectionEnd
-					field.transformationMethod =
-						if (showPassword) null else PasswordTransformationMethod.getInstance()
+					field.transformationMethod = if (showPassword) null else PasswordTransformationMethod.getInstance()
 					if (selectionStart >= 0 && selectionEnd >= 0) field.setSelection(
-						selectionStart,
-						selectionEnd
+						selectionStart, selectionEnd
 					)
-					(passwordLayout.findViewById<View>(com.google.android.material.R.id.text_input_end_icon) as Checkable)
-						.isChecked = showPassword
+					(passwordLayout.findViewById<View>(com.google.android.material.R.id.text_input_end_icon) as Checkable).isChecked = showPassword
 				}
 			}
 		}
@@ -96,12 +92,11 @@ class AuthActivity : AppCompatActivity() {
 	private fun updatePasswordRequirements() {
 		val password = findViewById<EditText>(R.id.auth_password).text.toString()
 		val requirements = listOf(
-			R.id.password_requirement_length to (password.length in 8..16),
-			R.id.password_requirement_digit to password.any { it in '0'..'9' },
+			R.id.password_requirement_length to (password.length in 8 .. 16),
+			R.id.password_requirement_digit to password.any { it in '0' .. '9' },
 			R.id.password_requirement_special to password.any { !it.isLetterOrDigit() && !it.isWhitespace() },
 			R.id.password_requirement_uppercase to password.any { it.isUpperCase() },
-			R.id.password_requirement_lowercase to password.any { it.isLowerCase() }
-		)
+			R.id.password_requirement_lowercase to password.any { it.isLowerCase() })
 		for ((id, met) in requirements) {
 			val color = when {
 				password.isEmpty() -> R.color.text_secondary

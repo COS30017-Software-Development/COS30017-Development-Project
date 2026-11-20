@@ -1,28 +1,28 @@
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
-	<group android:checkableBehavior="single">
+<menu xmlns:android = "http://schemas.android.com/apk/res/android" >
+	<group android:checkableBehavior = "single" >
 		<item
-			android:id="@+id/drawer_home"
-			android:icon="@drawable/ic_home"
-			android:title="@string/home" />
+			android:id = "@+id/drawer_home"
+			android:icon = "@drawable/ic_home"
+			android:title = "@string/home" />
 		<item
-			android:id="@+id/drawer_lost"
-			android:icon="@drawable/ic_lost"
-			android:title="@string/lost" />
+			android:id = "@+id/drawer_lost"
+			android:icon = "@drawable/ic_lost"
+			android:title = "@string/lost" />
 		<item
-			android:id="@+id/drawer_found"
-			android:icon="@drawable/ic_found"
-			android:title="@string/found" />
+			android:id = "@+id/drawer_found"
+			android:icon = "@drawable/ic_found"
+			android:title = "@string/found" />
 		<item
-			android:id="@+id/drawer_search"
-			android:icon="@android:drawable/ic_menu_search"
-			android:title="@string/search" />
+			android:id = "@+id/drawer_search"
+			android:icon = "@android:drawable/ic_menu_search"
+			android:title = "@string/search" />
 		<item
-			android:id="@+id/drawer_post"
-			android:icon="@drawable/ic_post"
-			android:title="@string/post" />
+			android:id = "@+id/drawer_post"
+			android:icon = "@drawable/ic_post"
+			android:title = "@string/post" />
 		<item
-			android:id="@+id/drawer_profile"
-			android:icon="@drawable/ic_profile"
-			android:title="@string/profile" />
-	</group>
-</menu>
+			android:id = "@+id/drawer_profile"
+			android:icon = "@drawable/ic_profile"
+			android:title = "@string/profile" />
+	</group >
+</menu >
