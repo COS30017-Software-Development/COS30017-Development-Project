@@ -1,5 +1,6 @@
 package com.example.cos30017developmentproject
 
+import android.content.Intent
 import android.os.Bundle
 import android.text.method.PasswordTransformationMethod
 import android.view.View
@@ -14,15 +15,30 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
+import androidx.lifecycle.lifecycleScope
+import com.example.cos30017developmentproject.auth.AuthValidator
+import com.example.cos30017developmentproject.auth.SessionManager
+import com.example.cos30017developmentproject.auth.UserRepository
+import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.google.android.material.textfield.TextInputLayout
+import kotlinx.coroutines.launch
+import java.util.Arrays
 
 class AuthActivity : AppCompatActivity() {
 	private var registering = false
+	private lateinit var repository: UserRepository
+	private lateinit var sessionManager: SessionManager
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 		enableEdgeToEdge()
 		setContentView(R.layout.activity_auth)
+		repository = UserRepository(AppDatabase.getInstance(this).userDao())
+		sessionManager = SessionManager(this)
+		if (sessionManager.userId != null) {
+			openProfile()
+			return
+		}
 		ViewCompat.setAccessibilityHeading(findViewById(R.id.auth_title), true)
 		val page = findViewById<View>(R.id.auth_page)
 		ViewCompat.setOnApplyWindowInsetsListener(page) { view, insets ->
@@ -39,13 +55,22 @@ class AuthActivity : AppCompatActivity() {
 			}
 		})
 		findViewById<View>(R.id.auth_switch).setOnClickListener { showForm(!registering) }
-		findViewById<EditText>(R.id.auth_password).doAfterTextChanged { updatePasswordRequirements() }
+		for (fieldId in listOf(
+			R.id.auth_name, R.id.auth_student_id, R.id.auth_email,
+			R.id.auth_password, R.id.auth_confirm_password
+		)) {
+			findViewById<EditText>(fieldId).doAfterTextChanged {
+				if (fieldId == R.id.auth_password) updatePasswordRequirements()
+				updateSubmitState()
+			}
+		}
 		findViewById<EditText>(R.id.auth_student_id).doAfterTextChanged { text ->
 			findViewById<TextInputLayout>(R.id.auth_student_id_layout).error = if (!text.isNullOrEmpty() && text.length != 9) getString(
 				R.string.auth_student_id_error
 			) else null
 		}
 		setupPasswordVisibility()
+		findViewById<View>(R.id.auth_submit).setOnClickListener { submit() }
 		showForm(savedInstanceState?.getBoolean("auth.registering") ?: false)
 	}
 
@@ -65,6 +90,98 @@ class AuthActivity : AppCompatActivity() {
 		findViewById<TextView>(R.id.auth_submit).setText(if (signUp) R.string.auth_sign_up else R.string.auth_login)
 		findViewById<TextView>(R.id.auth_switch).setText(if (signUp) R.string.auth_login else R.string.auth_sign_up)
 		title = getString(if (signUp) R.string.auth_sign_up else R.string.auth_login)
+		clearErrors()
+		updateSubmitState()
+	}
+
+	private fun updateSubmitState() {
+		val emailValid = AuthValidator.isEmailValid(text(R.id.auth_email))
+		val password = text(R.id.auth_password)
+		findViewById<View>(R.id.auth_submit).isEnabled = if (registering) {
+			AuthValidator.isNameValid(text(R.id.auth_name)) &&
+				AuthValidator.isStudentIdValid(text(R.id.auth_student_id)) &&
+				emailValid && AuthValidator.isPasswordValid(password) &&
+				password == text(R.id.auth_confirm_password)
+		} else emailValid && password.isNotEmpty()
+	}
+
+	private fun submit() {
+		clearErrors()
+		if (registering && !validateRegistration()) return
+		if (!registering && !AuthValidator.isEmailValid(text(R.id.auth_email))) {
+			layout(R.id.auth_email_layout).error = getString(R.string.auth_email_error)
+			return
+		}
+		val password = text(R.id.auth_password).toCharArray()
+		findViewById<View>(R.id.auth_submit).isEnabled = false
+		lifecycleScope.launch {
+			val result = try {
+				if (registering) repository.register(
+					text(R.id.auth_name), text(R.id.auth_student_id), text(R.id.auth_email), password
+				) else repository.login(text(R.id.auth_email), password)
+			} finally {
+				Arrays.fill(password, '\u0000')
+			}
+			when (result) {
+				is UserRepository.AuthResult.Success -> {
+					sessionManager.login(result.user.id)
+					openProfile()
+				}
+				UserRepository.AuthResult.DuplicateEmail -> {
+					layout(R.id.auth_email_layout).error = getString(R.string.auth_duplicate_email_error)
+					updateSubmitState()
+				}
+				UserRepository.AuthResult.InvalidCredentials -> {
+					layout(R.id.auth_password_layout).error = getString(R.string.auth_credentials_error)
+					updateSubmitState()
+				}
+				UserRepository.AuthResult.InvalidRegistration -> {
+					validateRegistration()
+					updateSubmitState()
+				}
+			}
+		}
+	}
+
+	private fun validateRegistration(): Boolean {
+		var valid = true
+		if (!AuthValidator.isNameValid(text(R.id.auth_name))) {
+			layout(R.id.auth_name_layout).error = getString(R.string.auth_name_error)
+			valid = false
+		}
+		if (!AuthValidator.isStudentIdValid(text(R.id.auth_student_id))) {
+			layout(R.id.auth_student_id_layout).error = getString(R.string.auth_student_id_error)
+			valid = false
+		}
+		if (!AuthValidator.isEmailValid(text(R.id.auth_email))) {
+			layout(R.id.auth_email_layout).error = getString(R.string.auth_email_error)
+			valid = false
+		}
+		if (!AuthValidator.isPasswordValid(text(R.id.auth_password))) {
+			layout(R.id.auth_password_layout).error = getString(R.string.auth_password_error)
+			valid = false
+		}
+		if (text(R.id.auth_password) != text(R.id.auth_confirm_password)) {
+			layout(R.id.auth_confirm_password_layout).error = getString(R.string.auth_confirm_password_error)
+			valid = false
+		}
+		return valid
+	}
+
+	private fun clearErrors() {
+		for (id in listOf(
+			R.id.auth_name_layout, R.id.auth_student_id_layout, R.id.auth_email_layout,
+			R.id.auth_password_layout, R.id.auth_confirm_password_layout
+		)) layout(id).error = null
+	}
+
+	private fun text(id: Int) = findViewById<EditText>(id).text.toString()
+
+	private fun layout(id: Int) = findViewById<TextInputLayout>(id)
+
+	private fun openProfile() {
+		startActivity(Intent(this, ProfileActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
+		finish()
 	}
 
 	private fun setupPasswordVisibility() {

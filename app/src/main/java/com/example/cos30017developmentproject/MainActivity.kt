@@ -185,9 +185,12 @@ class MainActivity : AppCompatActivity() {
 		findViewById<NestedScrollView>(R.id.home_scroll).smoothScrollTo(0, 0)
 	}
 
-	private fun openLogin() {        // Authentication is not connected yet; protected entries open the login UI.
+	private fun openLogin() {
 		bottomNavigation.selectedItemId = R.id.nav_home
-		startActivity(Intent(this, AuthActivity::class.java))
+		val destination = if (com.example.cos30017developmentproject.auth.SessionManager(this).userId == null) {
+			AuthActivity::class.java
+		} else ProfileActivity::class.java
+		startActivity(Intent(this, destination))
 	}
 
 	private fun showPreviewMessage(destination: String) {

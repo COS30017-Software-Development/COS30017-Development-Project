@@ -73,4 +73,15 @@ Bring it home.</string >
 	<string name = "password_requirement_uppercase" >• At least one uppercase letter</string >
 	<string name = "password_requirement_lowercase" >• At least one lowercase letter</string >
 	<string name = "auth_student_id_error" >Student ID must contain exactly 9 digits.</string >
+	<string name = "auth_name_error" >Enter your name.</string >
+	<string name = "auth_email_error" >Enter a valid email address.</string >
+	<string name = "auth_password_error" >Password does not meet all requirements.</string >
+	<string name = "auth_confirm_password_error" >Passwords do not match.</string >
+	<string name = "auth_duplicate_email_error" >An account already exists for this email.</string >
+	<string name = "auth_credentials_error" >Incorrect email or password.</string >
+	<string name = "profile_title" >Profile</string >
+	<string name = "profile_name_label" >Name</string >
+	<string name = "profile_email_label" >Email</string >
+	<string name = "profile_student_id_label" >Student ID</string >
+	<string name = "profile_logout" >Logout</string >
 </resources >

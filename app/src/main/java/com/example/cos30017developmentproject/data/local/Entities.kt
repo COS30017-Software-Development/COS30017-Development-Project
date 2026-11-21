@@ -11,7 +11,9 @@ data class UserEntity(
 	@PrimaryKey(autoGenerate = true) val id: Long = 0,
 	val username: String,
 	val email: String,
-	@ColumnInfo(name = "student_id") val studentId: String
+	@ColumnInfo(name = "student_id") val studentId: String,
+	@ColumnInfo(name = "password_hash") val passwordHash: ByteArray? = null,
+	@ColumnInfo(name = "password_salt") val passwordSalt: ByteArray? = null
 )
 
 @Entity(
