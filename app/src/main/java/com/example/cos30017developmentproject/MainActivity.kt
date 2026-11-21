@@ -145,7 +145,9 @@ class MainActivity : AppCompatActivity() {
 			} else showPreviewMessage(item.title.toString())
 			false
 		}
-		bottomNavigation.selectedItemId = savedInstanceState?.getInt("navigation.page") ?: R.id.nav_home
+		bottomNavigation.selectedItemId = intent.getIntExtra(
+			EXTRA_SELECTED_NAVIGATION, savedInstanceState?.getInt("navigation.page") ?: R.id.nav_home
+		)
 		drawer.closeDrawer(GravityCompat.START, false)
 	}
 
@@ -196,5 +198,9 @@ class MainActivity : AppCompatActivity() {
 	private fun showPreviewMessage(destination: String) {
 		Toast.makeText(this, getString(R.string.preview_message, destination), Toast.LENGTH_SHORT)
 			.show()
+	}
+
+	companion object {
+		const val EXTRA_SELECTED_NAVIGATION = "selected_navigation"
 	}
 }

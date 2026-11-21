@@ -51,4 +51,9 @@ class UserRepository(
 	}
 
 	suspend fun getUser(id: Long) = userDao.getById(id)
+
+	suspend fun updateUsername(id: Long, name: String): Boolean {
+		val username = name.trim()
+		return AuthValidator.isNameValid(username) && userDao.updateUsername(id, username) == 1
+	}
 }

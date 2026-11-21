@@ -84,5 +84,12 @@ Bring it home.</string >
 	<string name = "profile_name_label" >Name</string >
 	<string name = "profile_email_label" >Email</string >
 	<string name = "profile_student_id_label" >Student ID</string >
+	<string name = "profile_default_avatar" >Default profile avatar</string >
+	<string name = "profile_edit" >Edit profile</string >
+	<string name = "profile_edit_title" >Edit profile</string >
+	<string name = "profile_edit_name_help" >You can update your display name. Profile photo editing will be available later.</string >
+	<string name = "profile_save" >Save name</string >
+	<string name = "profile_cancel" >Cancel</string >
+	<string name = "profile_name_saved" >Name updated.</string >
 	<string name = "profile_logout" >Logout</string >
 </resources >
