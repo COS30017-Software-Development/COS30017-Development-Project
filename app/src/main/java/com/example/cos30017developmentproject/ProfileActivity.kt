@@ -6,9 +6,13 @@ import android.app.Dialog
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
@@ -128,16 +132,42 @@ class ProfileActivity : AppCompatActivity() {
 			avatar.imageTintList = null
 			val uri = Uri.fromFile(file)
 			avatar.setImageURI(uri)
-			avatar.setOnClickListener { showAvatarViewer(uri) }
+			avatar.setOnClickListener { showAvatarViewer(uri, avatar) }
 			avatar.isClickable = true
 		}
 	}
 
-	private fun showAvatarViewer(uri: Uri) {
+	private fun showAvatarViewer(uri: Uri, sourceAvatar: View) {
 		val dialog = Dialog(this, android.R.style.Theme_Material_Light_NoActionBar_Fullscreen)
 		val content = layoutInflater.inflate(R.layout.dialog_avatar_viewer, null)
-		content.findViewById<ImageView>(R.id.avatar_viewer_image).setImageURI(uri)
-		content.setOnClickListener { dialog.dismiss() }
+		val scrim = content.findViewById<View>(R.id.avatar_viewer_scrim)
+		val viewerImage = content.findViewById<ImageView>(R.id.avatar_viewer_image)
+		val sourceLocation = IntArray(2)
+		sourceAvatar.getLocationOnScreen(sourceLocation)
+		val sourceSize = minOf(sourceAvatar.width, sourceAvatar.height)
+		viewerImage.setImageURI(uri)
+		dialog.setCancelable(false)
+		val closeViewer = {
+			closeAvatarViewer(dialog, scrim, viewerImage, sourceLocation, sourceSize)
+		}
+		content.setOnClickListener { closeViewer() }
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+			val backCallback = OnBackInvokedCallback { closeViewer() }
+			dialog.onBackInvokedDispatcher.registerOnBackInvokedCallback(
+				OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+				backCallback
+			)
+			dialog.setOnDismissListener {
+				dialog.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(backCallback)
+			}
+		} else {
+			dialog.setOnKeyListener { _, keyCode, event ->
+				if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+					if (event.action == android.view.KeyEvent.ACTION_UP) closeViewer()
+					true
+				} else false
+				}
+		}
 		dialog.setContentView(content)
 		dialog.show()
 		dialog.window?.apply {
@@ -145,6 +175,50 @@ class ProfileActivity : AppCompatActivity() {
 			setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
 			clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
 		}
+		content.post {
+			val expandedSize = (content.width * AVATAR_VIEWER_WIDTH_RATIO).toInt()
+			val expandedX = (content.width - expandedSize) / 2f
+			val expandedY = (content.height - expandedSize) / 2f
+			viewerImage.layoutParams = FrameLayout.LayoutParams(sourceSize, sourceSize)
+			viewerImage.x = sourceLocation[0].toFloat()
+			viewerImage.y = sourceLocation[1].toFloat()
+			viewerImage.pivotX = 0f
+			viewerImage.pivotY = 0f
+			scrim.alpha = 0f
+			viewerImage.animate()
+				.x(expandedX)
+				.y(expandedY)
+				.scaleX(expandedSize.toFloat() / sourceSize)
+				.scaleY(expandedSize.toFloat() / sourceSize)
+				.setDuration(AVATAR_VIEWER_ANIMATION_DURATION)
+				.start()
+			scrim.animate().alpha(1f).setDuration(AVATAR_VIEWER_ANIMATION_DURATION).start()
+		}
+	}
+
+	private fun closeAvatarViewer(
+		dialog: Dialog,
+		scrim: View,
+		viewerImage: ImageView,
+		sourceLocation: IntArray,
+		sourceSize: Int
+	) {
+		if (!dialog.isShowing || viewerImage.getTag(R.id.avatar_viewer_image) == true) return
+		viewerImage.setTag(R.id.avatar_viewer_image, true)
+		viewerImage.animate()
+			.x(sourceLocation[0].toFloat())
+			.y(sourceLocation[1].toFloat())
+			.scaleX(1f)
+			.scaleY(1f)
+			.setDuration(AVATAR_VIEWER_ANIMATION_DURATION)
+			.withEndAction { dialog.dismiss() }
+			.start()
+		scrim.animate().alpha(0f).setDuration(AVATAR_VIEWER_ANIMATION_DURATION).start()
+	}
+
+	private companion object {
+		const val AVATAR_VIEWER_WIDTH_RATIO = 0.9f
+		const val AVATAR_VIEWER_ANIMATION_DURATION = 280L
 	}
 
 	private fun openMain(navigationId: Int) {
