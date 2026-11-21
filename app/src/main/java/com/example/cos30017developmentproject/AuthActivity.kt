@@ -64,6 +64,7 @@ class AuthActivity : AppCompatActivity() {
 					R.id.auth_name -> clearFieldError(R.id.auth_name_layout)
 					R.id.auth_student_id -> clearFieldError(R.id.auth_student_id_layout)
 					R.id.auth_email -> clearFieldError(R.id.auth_email_layout)
+					R.id.auth_password -> clearFieldError(R.id.auth_password_layout)
 				}
 				if (fieldId == R.id.auth_password || fieldId == R.id.auth_confirm_password) {
 					updatePasswordRequirements()
