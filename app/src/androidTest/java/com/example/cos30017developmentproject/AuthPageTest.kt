@@ -168,6 +168,8 @@ class AuthPageTest {
 
 				val password = activity.findViewById<EditText>(R.id.auth_password)
 				val confirmation = activity.findViewById<EditText>(R.id.auth_confirm_password)
+				activity.findViewById<EditText>(R.id.auth_name).setText("Student")
+				activity.findViewById<EditText>(R.id.auth_email).setText("invalid-email")
 				password.setText("Aa1!abcd")
 				confirmation.setText("Aa1!abcd")
 				assertTrue(activity.findViewById<View>(R.id.auth_submit).isEnabled)
@@ -177,7 +179,6 @@ class AuthPageTest {
 				assertNull(studentLayout.error)
 
 				val email = activity.findViewById<EditText>(R.id.auth_email)
-				email.setText("invalid-email")
 				activity.findViewById<View>(R.id.auth_submit).performClick()
 				assertEquals(activity.getString(R.string.auth_email_error), activity.findViewById<com.google.android.material.textfield.TextInputLayout>(
 					R.id.auth_email_layout

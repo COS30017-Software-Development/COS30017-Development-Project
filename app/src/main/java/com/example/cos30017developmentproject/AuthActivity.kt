@@ -61,9 +61,9 @@ class AuthActivity : AppCompatActivity() {
 		)) {
 			findViewById<EditText>(fieldId).doAfterTextChanged {
 				when (fieldId) {
-					R.id.auth_name -> layout(R.id.auth_name_layout).error = null
-					R.id.auth_student_id -> layout(R.id.auth_student_id_layout).error = null
-					R.id.auth_email -> layout(R.id.auth_email_layout).error = null
+					R.id.auth_name -> clearFieldError(R.id.auth_name_layout)
+					R.id.auth_student_id -> clearFieldError(R.id.auth_student_id_layout)
+					R.id.auth_email -> clearFieldError(R.id.auth_email_layout)
 				}
 				if (fieldId == R.id.auth_password || fieldId == R.id.auth_confirm_password) {
 					updatePasswordRequirements()
@@ -97,21 +97,19 @@ class AuthActivity : AppCompatActivity() {
 	}
 
 	private fun updateSubmitState() {
-		val emailValid = AuthValidator.isEmailValid(text(R.id.auth_email))
 		val password = text(R.id.auth_password)
 		findViewById<View>(R.id.auth_submit).isEnabled = if (registering) {
-			AuthValidator.isPasswordValid(password) &&
+			text(R.id.auth_name).isNotEmpty() &&
+				text(R.id.auth_student_id).isNotEmpty() &&
+				text(R.id.auth_email).isNotEmpty() &&
+				AuthValidator.isPasswordValid(password) &&
 				password == text(R.id.auth_confirm_password)
-		} else emailValid && AuthValidator.isPasswordValid(password)
+		} else text(R.id.auth_email).isNotEmpty() && password.isNotEmpty()
 	}
 
 	private fun submit() {
 		clearErrors()
 		if (registering && !validateRegistration()) return
-		if (!registering && !AuthValidator.isEmailValid(text(R.id.auth_email))) {
-			layout(R.id.auth_email_layout).error = getString(R.string.auth_email_error)
-			return
-		}
 		val password = text(R.id.auth_password).toCharArray()
 		findViewById<View>(R.id.auth_submit).isEnabled = false
 		lifecycleScope.launch {
@@ -172,7 +170,14 @@ class AuthActivity : AppCompatActivity() {
 		for (id in listOf(
 			R.id.auth_name_layout, R.id.auth_student_id_layout, R.id.auth_email_layout,
 			R.id.auth_password_layout, R.id.auth_confirm_password_layout
-		)) layout(id).error = null
+		)) clearFieldError(id)
+	}
+
+	private fun clearFieldError(id: Int) {
+		layout(id).apply {
+			error = null
+			isErrorEnabled = false
+		}
 	}
 
 	private fun text(id: Int) = findViewById<EditText>(id).text.toString()

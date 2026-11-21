@@ -23,5 +23,6 @@ class AuthValidatorTest {
 		assertFalse(AuthValidator.isStudentIdValid("12345678"))
 		assertTrue(AuthValidator.isEmailValid("student@example.com"))
 		assertFalse(AuthValidator.isEmailValid("student@invalid"))
+		assertFalse(AuthValidator.isEmailValid("student.example.com"))
 	}
 }
