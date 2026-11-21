@@ -143,6 +143,10 @@ class EditProfileActivity : AppCompatActivity() {
 			setCompressionFormat(android.graphics.Bitmap.CompressFormat.JPEG)
 			setCompressionQuality(90)
 			setToolbarColor(ContextCompat.getColor(this@EditProfileActivity, R.color.black))
+			setToolbarWidgetColor(ContextCompat.getColor(this@EditProfileActivity, R.color.white))
+			setToolbarCancelDrawable(R.drawable.ic_crop_cancel)
+			setToolbarCropDrawable(R.drawable.ic_crop_confirm)
+			setDimmedLayerColor(ContextCompat.getColor(this@EditProfileActivity, R.color.crop_dim_light))
 			setActiveControlsWidgetColor(ContextCompat.getColor(this@EditProfileActivity, R.color.brand_red_accessible))
 		}
 		cropPhoto.launch(
