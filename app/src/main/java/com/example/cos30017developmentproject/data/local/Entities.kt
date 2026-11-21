@@ -12,6 +12,7 @@ data class UserEntity(
 	val username: String,
 	val email: String,
 	@ColumnInfo(name = "student_id") val studentId: String,
+	@ColumnInfo(name = "avatar_path") val avatarPath: String? = null,
 	@ColumnInfo(name = "password_hash") val passwordHash: ByteArray? = null,
 	@ColumnInfo(name = "password_salt") val passwordSalt: ByteArray? = null
 )

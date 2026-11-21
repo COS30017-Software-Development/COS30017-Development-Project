@@ -28,6 +28,9 @@ interface UserDao {
 	@Query("UPDATE users SET username = :username WHERE id = :id")
 	suspend fun updateUsername(id: Long, username: String): Int
 
+	@Query("UPDATE users SET username = :username, avatar_path = :avatarPath WHERE id = :id")
+	suspend fun updateProfile(id: Long, username: String, avatarPath: String?): Int
+
 	@Delete
 	suspend fun delete(user: UserEntity)
 }

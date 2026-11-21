@@ -31,14 +31,16 @@
 				android:paddingTop="32dp"
 				android:paddingBottom="32dp">
 
-				<ImageView
+				<com.google.android.material.imageview.ShapeableImageView
 					android:id="@+id/profile_avatar"
 					android:layout_width="112dp"
 					android:layout_height="112dp"
 					android:background="@drawable/bg_profile_avatar"
 					android:contentDescription="@string/profile_default_avatar"
 					android:padding="28dp"
+					android:scaleType="centerCrop"
 					android:src="@drawable/ic_profile"
+					app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.Campus.Circle"
 					app:tint="@color/white" />
 
 				<TextView

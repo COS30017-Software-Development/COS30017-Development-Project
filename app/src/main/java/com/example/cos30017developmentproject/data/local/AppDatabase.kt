@@ -10,7 +10,7 @@ import com.example.cos30017developmentproject.auth.PasswordHasher
 
 @Database(
 	entities = [UserEntity::class, LostItemEntity::class, FoundItemEntity::class],
-	version = 3,
+	version = 4,
 	exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -32,6 +32,11 @@ abstract class AppDatabase : RoomDatabase() {
 				setSeedUserPassword(db, "user2@swinburne.edu.my", "User2@Pass123")
 			}
 		}
+		val MIGRATION_3_4 = object : Migration(3, 4) {
+			override fun migrate(db: SupportSQLiteDatabase) {
+				db.execSQL("ALTER TABLE users ADD COLUMN avatar_path TEXT")
+			}
+		}
 
 		@Volatile
 		private var instance: AppDatabase? = null
@@ -41,7 +46,7 @@ abstract class AppDatabase : RoomDatabase() {
 				context.applicationContext,
 				AppDatabase::class.java,
 				DATABASE_NAME
-			).addMigrations(MIGRATION_1_2, MIGRATION_2_3).addCallback(SeedDataCallback()).build().also { instance = it }
+			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).addCallback(SeedDataCallback()).build().also { instance = it }
 		}
 	}
 }

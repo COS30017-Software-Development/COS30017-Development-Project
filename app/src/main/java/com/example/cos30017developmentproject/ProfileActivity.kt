@@ -1,9 +1,12 @@
 package com.example.cos30017developmentproject
 
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -11,10 +14,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.content.ContextCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.auth.UserRepository
+import com.example.cos30017developmentproject.auth.AvatarStorage
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigation.NavigationView
@@ -100,6 +105,22 @@ class ProfileActivity : AppCompatActivity() {
 			findViewById<TextView>(R.id.profile_name).text = user.username
 			findViewById<TextView>(R.id.profile_email).text = user.email
 			findViewById<TextView>(R.id.profile_student_id).text = user.studentId
+			showAvatar(user.avatarPath)
+		}
+	}
+
+	private fun showAvatar(path: String?) {
+		val avatar = findViewById<ImageView>(R.id.profile_avatar)
+		val file = AvatarStorage.fileFor(this, path)
+		if (file == null) {
+			val padding = (28 * resources.displayMetrics.density).toInt()
+			avatar.setPadding(padding, padding, padding, padding)
+			avatar.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.white))
+			avatar.setImageResource(R.drawable.ic_profile)
+		} else {
+			avatar.setPadding(0, 0, 0, 0)
+			avatar.imageTintList = null
+			avatar.setImageURI(Uri.fromFile(file))
 		}
 	}
 

@@ -56,4 +56,9 @@ class UserRepository(
 		val username = name.trim()
 		return AuthValidator.isNameValid(username) && userDao.updateUsername(id, username) == 1
 	}
+
+	suspend fun updateProfile(id: Long, name: String, avatarPath: String?): Boolean {
+		val username = name.trim()
+		return AuthValidator.isNameValid(username) && userDao.updateProfile(id, username, avatarPath) == 1
+	}
 }
