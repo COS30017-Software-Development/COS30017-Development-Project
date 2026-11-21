@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageView
@@ -37,6 +38,7 @@ class EditProfileActivity : AppCompatActivity() {
 	private var originalAvatarPath: String? = null
 	private var pendingAvatarUri: Uri? = null
 	private var pendingAvatarFilePath: String? = null
+	private var cropSourceFilePath: String? = null
 	private var cameraUri: Uri? = null
 	private var cameraFilePath: String? = null
 
@@ -55,14 +57,16 @@ class EditProfileActivity : AppCompatActivity() {
 
 	private val cropPhoto = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
 		if (result.resultCode == RESULT_OK) {
-			val cropped = UCrop.getOutput(result.data ?: Intent())
-			if (cropped != null) {
-				pendingAvatarUri = cropped
-				previewAvatar(cropped)
+			val croppedFile = pendingAvatarFilePath?.let(::File)
+			if (croppedFile?.isFile == true && croppedFile.length() > 0L) {
+				pendingAvatarUri = Uri.fromFile(croppedFile)
+				previewAvatar(pendingAvatarUri!!)
 			} else showAvatarError()
 		} else if (result.resultCode == UCrop.RESULT_ERROR) {
+			Log.e(TAG, "Avatar crop failed", UCrop.getError(result.data ?: Intent()))
 			showAvatarError()
 		} else clearPendingAvatar()
+		clearCropSourceFile()
 		clearCameraFile()
 	}
 
@@ -134,11 +138,18 @@ class EditProfileActivity : AppCompatActivity() {
 		cameraUri?.let(takePhoto::launch)
 	}
 
-	private fun startCrop(source: Uri) {
+	private fun startCrop(source: Uri) = lifecycleScope.launch {
+		val cropSource = try {
+			AvatarStorage.stageForCrop(this@EditProfileActivity, source)
+		} catch (_: Exception) {
+			showAvatarError()
+			return@launch
+		}
 		clearPendingAvatar()
+		clearCropSourceFile()
+		cropSourceFilePath = cropSource.absolutePath
 		val destination = File(File(cacheDir, "avatars").apply { mkdirs() }, "crop_${UUID.randomUUID()}.jpg")
 		pendingAvatarFilePath = destination.absolutePath
-		val destinationUri = FileProvider.getUriForFile(this, "$packageName.fileprovider", destination)
 		val options = UCrop.Options().apply {
 			setCompressionFormat(android.graphics.Bitmap.CompressFormat.JPEG)
 			setCompressionQuality(90)
@@ -150,11 +161,11 @@ class EditProfileActivity : AppCompatActivity() {
 			setActiveControlsWidgetColor(ContextCompat.getColor(this@EditProfileActivity, R.color.brand_red_accessible))
 		}
 		cropPhoto.launch(
-			UCrop.of(source, destinationUri)
+			UCrop.of(Uri.fromFile(cropSource), Uri.fromFile(destination))
 				.withAspectRatio(1f, 1f)
 				.withMaxResultSize(600, 600)
 				.withOptions(options)
-				.getIntent(this)
+				.getIntent(this@EditProfileActivity)
 		)
 	}
 
@@ -232,7 +243,13 @@ class EditProfileActivity : AppCompatActivity() {
 		cameraUri = null
 	}
 
+	private fun clearCropSourceFile() {
+		cropSourceFilePath?.let { File(it).delete() }
+		cropSourceFilePath = null
+	}
+
 	companion object {
+		private const val TAG = "EditProfileActivity"
 		private const val STATE_PENDING_AVATAR_URI = "profile.pending_avatar_uri"
 		private const val STATE_PENDING_AVATAR_PATH = "profile.pending_avatar_path"
 		private const val STATE_CAMERA_URI = "profile.camera_uri"

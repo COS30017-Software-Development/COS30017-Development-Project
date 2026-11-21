@@ -20,10 +20,23 @@ object AvatarStorage {
 	suspend fun save(context: Context, userId: Long, source: Uri): String = withContext(Dispatchers.IO) {
 		val directory = File(context.filesDir, AVATAR_DIRECTORY).apply { mkdirs() }
 		val destination = File(directory, "avatar_${userId}_${UUID.randomUUID()}.jpg")
-		context.contentResolver.openInputStream(source)?.use { input ->
+		val inputStream = if (source.scheme == "file") source.path?.let(::File)?.inputStream()
+		else context.contentResolver.openInputStream(source)
+		inputStream?.use { input ->
 			destination.outputStream().use { output -> input.copyTo(output) }
 		} ?: throw IllegalStateException("Unable to read the cropped avatar.")
 		destination.absolutePath
+	}
+
+	suspend fun stageForCrop(context: Context, source: Uri): File = withContext(Dispatchers.IO) {
+		val directory = File(context.cacheDir, AVATAR_DIRECTORY).apply { mkdirs() }
+		val destination = File(directory, "source_${UUID.randomUUID()}.jpg")
+		val inputStream = if (source.scheme == "file") source.path?.let(::File)?.inputStream()
+		else context.contentResolver.openInputStream(source)
+		inputStream?.use { input ->
+			destination.outputStream().use { output -> input.copyTo(output) }
+		} ?: throw IllegalStateException("Unable to read the selected avatar.")
+		destination
 	}
 
 	fun delete(context: Context, path: String?) {
