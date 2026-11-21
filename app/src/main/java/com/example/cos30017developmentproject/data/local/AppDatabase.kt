@@ -6,10 +6,11 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.cos30017developmentproject.auth.PasswordHasher
 
 @Database(
 	entities = [UserEntity::class, LostItemEntity::class, FoundItemEntity::class],
-	version = 2,
+	version = 3,
 	exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -25,6 +26,12 @@ abstract class AppDatabase : RoomDatabase() {
 				db.execSQL("ALTER TABLE users ADD COLUMN password_salt BLOB")
 			}
 		}
+		val MIGRATION_2_3 = object : Migration(2, 3) {
+			override fun migrate(db: SupportSQLiteDatabase) {
+				setSeedUserPassword(db, "user1@swinburne.edu.my", "User1@Pass123")
+				setSeedUserPassword(db, "user2@swinburne.edu.my", "User2@Pass123")
+			}
+		}
 
 		@Volatile
 		private var instance: AppDatabase? = null
@@ -34,7 +41,7 @@ abstract class AppDatabase : RoomDatabase() {
 				context.applicationContext,
 				AppDatabase::class.java,
 				DATABASE_NAME
-			).addMigrations(MIGRATION_1_2).addCallback(SeedDataCallback()).build().also { instance = it }
+			).addMigrations(MIGRATION_1_2, MIGRATION_2_3).addCallback(SeedDataCallback()).build().also { instance = it }
 		}
 	}
 }
@@ -42,8 +49,8 @@ abstract class AppDatabase : RoomDatabase() {
 private class SeedDataCallback : RoomDatabase.Callback() {
 	override fun onCreate(db: SupportSQLiteDatabase) {
 		super.onCreate(db)
-		db.execSQL("INSERT INTO users (id, username, email, student_id) VALUES (1, 'user1', 'user1@swinburne.edu.my', '100000001')")
-		db.execSQL("INSERT INTO users (id, username, email, student_id) VALUES (2, 'user2', 'user2@swinburne.edu.my', '100000002')")
+		insertSeedUser(db, 1, "user1", "user1@swinburne.edu.my", "100000001", "User1@Pass123")
+		insertSeedUser(db, 2, "user2", "user2@swinburne.edu.my", "100000002", "User2@Pass123")
 
 		// These records preserve the existing SampleItem titles, descriptions, types, and drawable names.
 		db.execSQL("INSERT INTO lost_items (title, description, location, category, image_name, posted_by_user_id) VALUES ('Water bottle', 'Lost in a lecture room. A reusable bottle with a black lid.', 'Lecture room', 'Bottle', 'sample_bottle', 1)")
@@ -55,5 +62,39 @@ private class SeedDataCallback : RoomDatabase.Callback() {
 		db.execSQL("INSERT INTO found_items (title, description, location, category, image_name, posted_by_user_id) VALUES ('Black backpack', 'Found near the library entrance. Black backpack with a front zip pocket.', 'Library entrance', 'Backpack', 'sample_backpack', 2)")
 		db.execSQL("INSERT INTO found_items (title, description, location, category, image_name, posted_by_user_id) VALUES ('Headphones', 'Found in a campus study area. Black over-ear headphones.', 'Study area', 'Headphones', 'sample_headphones', 1)")
 		db.execSQL("INSERT INTO found_items (title, description, location, category, image_name, posted_by_user_id) VALUES ('Sports bottle', 'Found near the sports area. A reusable bottle with a screw-top lid.', 'Sports area', 'Bottle', 'sample_bottle', 2)")
+	}
+}
+
+private fun insertSeedUser(
+	db: SupportSQLiteDatabase,
+	id: Long,
+	username: String,
+	email: String,
+	studentId: String,
+	password: String
+) {
+	val storedPassword = PasswordHasher().hash(password.toCharArray())
+	db.compileStatement(
+		"INSERT INTO users (id, username, email, student_id, password_hash, password_salt) VALUES (?, ?, ?, ?, ?, ?)"
+	).apply {
+		bindLong(1, id)
+		bindString(2, username)
+		bindString(3, email)
+		bindString(4, studentId)
+		bindBlob(5, storedPassword.hash)
+		bindBlob(6, storedPassword.salt)
+		executeInsert()
+	}
+}
+
+private fun setSeedUserPassword(db: SupportSQLiteDatabase, email: String, password: String) {
+	val storedPassword = PasswordHasher().hash(password.toCharArray())
+	db.compileStatement(
+		"UPDATE users SET password_hash = ?, password_salt = ? WHERE email = ? AND password_hash IS NULL AND password_salt IS NULL"
+	).apply {
+		bindBlob(1, storedPassword.hash)
+		bindBlob(2, storedPassword.salt)
+		bindString(3, email)
+		executeUpdateDelete()
 	}
 }
