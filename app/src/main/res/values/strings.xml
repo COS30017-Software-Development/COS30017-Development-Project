@@ -38,8 +38,8 @@ Bring it home.</string >
 	<string name = "page_label" >Page %1$d of %2$d</string >
 	<string name = "no_items_found" >No items found. Try another search.</string >
 	<plurals name = "sample_item_count" >
-		<item quantity = "one" >%d item · Sample data</item >
-		<item quantity = "other" >%d items · Sample data</item >
+		<item quantity = "one" >%d item</item >
+		<item quantity = "other" >%d items</item >
 	</plurals >
 	<string name = "sample_laptop_backpack_title" >Laptop backpack</string >
 	<string name = "sample_laptop_backpack_description" >Found beside a campus bench. A backpack with a padded laptop compartment.</string >

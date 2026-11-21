@@ -37,28 +37,21 @@ class ItemsPageTest {
 	private fun MainActivity.label(id: Int) = findViewById<TextView>(id).text.toString()
 
 	@Test
-	fun navigationAndPaginationShowAllTwelveItems() {
+	fun navigationShowsAllRoomItems() {
 		ActivityScenario.launch(MainActivity::class.java).use { scenario ->
 			scenario.checkUi {
 				assertEquals(4, it.findViewById<RecyclerView>(R.id.item_list).adapter!!.itemCount)
 				it.click(R.id.nav_items)
 				assertTrue(it.findViewById<View>(R.id.items_page).isShown)
-				assertEquals("12 items · Sample data", it.label(R.id.items_result_count))
-				assertEquals("Page 1 of 2", it.label(R.id.page_label))
+				assertEquals("8 items", it.label(R.id.items_result_count))
+				assertEquals("Page 1 of 1", it.label(R.id.page_label))
 				assertFalse(it.findViewById<View>(R.id.previous_page).isEnabled)
-				it.click(R.id.next_page)
-				assertEquals("Page 2 of 2", it.label(R.id.page_label))
 				assertFalse(it.findViewById<View>(R.id.next_page).isEnabled)
 			}
 			scenario.checkUi {
 				val adapter = it.findViewById<RecyclerView>(R.id.items_list).adapter as com.example.cos30017developmentproject.ui.home.ItemCardAdapter
-				assertEquals(4, adapter.itemCount)
-				assertEquals(
-					R.string.sample_study_backpack_title,
-					adapter.currentList.first().title
-				)
-				it.click(R.id.previous_page)
-				assertEquals("Page 1 of 2", it.label(R.id.page_label))
+				assertEquals(8, adapter.itemCount)
+				assertEquals("Locker keys", adapter.currentList.first().title)
 			}
 		}
 	}
@@ -70,13 +63,13 @@ class ItemsPageTest {
 				it.click(R.id.nav_items)
 				val search = it.findViewById<EditText>(R.id.items_search)
 				search.setText("  LIBRARY  ")
-				assertEquals("3 items · Sample data", it.label(R.id.items_result_count))
+				assertEquals("2 items", it.label(R.id.items_result_count))
 				assertEquals("Page 1 of 1", it.label(R.id.page_label))
 				search.setText("not-an-existing-item")
 				assertTrue(it.findViewById<View>(R.id.items_empty).isShown)
 				assertFalse(it.findViewById<View>(R.id.items_pagination).isShown)
 				search.setText("")
-				assertEquals("12 items · Sample data", it.label(R.id.items_result_count))
+				assertEquals("8 items", it.label(R.id.items_result_count))
 			}
 		}
 	}
@@ -86,7 +79,6 @@ class ItemsPageTest {
 		ActivityScenario.launch(MainActivity::class.java).use { scenario ->
 			scenario.checkUi {
 				it.click(R.id.nav_items)
-				it.click(R.id.next_page)
 				it.click(R.id.toggle_item_layout)
 				assertEquals(
 					it.getString(R.string.switch_to_grid),
@@ -99,13 +91,13 @@ class ItemsPageTest {
 			scenario.recreate()
 			scenario.checkUi {
 				assertTrue(it.findViewById<View>(R.id.items_page).isShown)
-				assertEquals("Page 2 of 2", it.label(R.id.page_label))
+				assertEquals("Page 1 of 1", it.label(R.id.page_label))
 				assertEquals(
 					it.getString(R.string.switch_to_grid),
 					it.findViewById<View>(R.id.toggle_item_layout).contentDescription
 				)
 				it.click(R.id.toggle_item_layout)
-				assertEquals("Page 2 of 2", it.label(R.id.page_label))
+				assertEquals("Page 1 of 1", it.label(R.id.page_label))
 				assertEquals(
 					it.getString(R.string.switch_to_list),
 					it.findViewById<View>(R.id.toggle_item_layout).contentDescription

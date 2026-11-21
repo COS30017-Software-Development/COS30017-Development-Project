@@ -16,13 +16,19 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.NestedScrollView
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.cos30017developmentproject.data.local.AppDatabase
+import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
 import com.example.cos30017developmentproject.ui.home.ItemCardAdapter
-import com.example.cos30017developmentproject.ui.home.SampleItem
+import com.example.cos30017developmentproject.ui.home.toItemCard
+import com.example.cos30017developmentproject.ui.items.ItemFilter
 import com.example.cos30017developmentproject.ui.items.ItemsPage
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigation.NavigationView
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 	private lateinit var drawer: DrawerLayout
@@ -30,6 +36,7 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var sideNavigation: NavigationView
 	private lateinit var itemsPage: ItemsPage
 	private lateinit var backCallback: OnBackPressedCallback
+	private lateinit var repository: LostAndFoundRepository
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -39,7 +46,8 @@ class MainActivity : AppCompatActivity() {
 		bottomNavigation = findViewById(R.id.bottom_navigation)
 		bottomNavigation.isItemActiveIndicatorEnabled = false
 		sideNavigation = findViewById(R.id.side_navigation)
-		itemsPage = ItemsPage(findViewById(R.id.items_page), window, savedInstanceState)
+		repository = LostAndFoundRepository(AppDatabase.getInstance(this))
+		itemsPage = ItemsPage(findViewById(R.id.items_page), window, savedInstanceState, repository, this)
 		ViewCompat.setOnApplyWindowInsetsListener(drawer) { _, insets ->
 			val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
 			val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime())            // DrawerLayout lays out children without respecting its own padding.
@@ -56,7 +64,14 @@ class MainActivity : AppCompatActivity() {
 			layoutManager = GridLayoutManager(
 				context, if (config.screenWidthDp >= 360 && config.fontScale <= 1.3f) 2 else 1
 			)
-			adapter = ItemCardAdapter(SampleItem.examples.take(4))
+			val itemAdapter = ItemCardAdapter()
+			adapter = itemAdapter
+			lifecycleScope.launch {
+				combine(repository.observeLostItems(), repository.observeFoundItems()) { lost, found ->
+					(lost.map { it.toItemCard(this@MainActivity) } +
+						found.map { it.toItemCard(this@MainActivity) }).take(4)
+				}.collect { itemAdapter.submitList(it) }
+			}
 		}
 		backCallback = object : OnBackPressedCallback(false) {
 			override fun handleOnBackPressed() {
@@ -89,8 +104,13 @@ class MainActivity : AppCompatActivity() {
 		}
 		bottomNavigation.setOnItemSelectedListener { item ->
 			when (item.itemId) {
-				R.id.nav_home, R.id.nav_items -> {
-					showPage(item.itemId == R.id.nav_items)
+				R.id.nav_home -> {
+					showPage(false)
+					true
+				}
+
+				R.id.nav_items -> {
+					showItems(ItemFilter.ALL)
 					true
 				}
 
@@ -113,6 +133,13 @@ class MainActivity : AppCompatActivity() {
 			if (item.itemId == R.id.drawer_home) {
 				bottomNavigation.selectedItemId = R.id.nav_home
 				scrollHomeToTop()
+			} else if (item.itemId == R.id.drawer_lost) {
+				showItems(ItemFilter.LOST)
+			} else if (item.itemId == R.id.drawer_found) {
+				showItems(ItemFilter.FOUND)
+			} else if (item.itemId == R.id.drawer_search) {
+				showItems(ItemFilter.ALL)
+				itemsPage.focusSearch()
 			} else if (item.itemId == R.id.drawer_post || item.itemId == R.id.drawer_profile) {
 				openLogin()
 			} else showPreviewMessage(item.title.toString())
@@ -136,6 +163,18 @@ class MainActivity : AppCompatActivity() {
 		WindowCompat.getInsetsController(window, drawer).hide(WindowInsetsCompat.Type.ime())
 		currentFocus?.clearFocus()
 		updateBackCallback()
+	}
+
+	private fun showItems(filter: ItemFilter) {
+		itemsPage.setFilter(filter)
+		showPage(true)
+		sideNavigation.setCheckedItem(
+			when (filter) {
+				ItemFilter.ALL -> R.id.drawer_search
+				ItemFilter.LOST -> R.id.drawer_lost
+				ItemFilter.FOUND -> R.id.drawer_found
+			}
+		)
 	}
 
 	private fun updateBackCallback() {

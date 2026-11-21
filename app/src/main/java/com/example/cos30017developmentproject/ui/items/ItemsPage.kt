@@ -13,11 +13,27 @@ import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.example.cos30017developmentproject.R
+import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
 import com.example.cos30017developmentproject.ui.home.ItemCardAdapter
-import com.example.cos30017developmentproject.ui.home.SampleItem
+import com.example.cos30017developmentproject.ui.home.ItemCard
+import com.example.cos30017developmentproject.ui.home.toItemCard
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
-class ItemsPage(private val view: View, window: Window, savedState: Bundle?) {
+enum class ItemFilter { ALL, LOST, FOUND }
+
+class ItemsPage(
+	private val view: View,
+	window: Window,
+	savedState: Bundle?,
+	private val repository: LostAndFoundRepository,
+	private val lifecycleOwner: LifecycleOwner
+) {
 	private val insetsController = WindowCompat.getInsetsController(window, view)
 	private val search = view.findViewById<EditText>(R.id.items_search)
 	private val list = view.findViewById<RecyclerView>(R.id.items_list)
@@ -26,17 +42,16 @@ class ItemsPage(private val view: View, window: Window, savedState: Bundle?) {
 	private val next = view.findViewById<ImageButton>(R.id.next_page)
 	private val adapter = ItemCardAdapter()
 	private val layout = GridLayoutManager(view.context, 2)
-	private val pagination = ItemPagination(SampleItem.examples) {
-		"${view.context.getString(it.title)}\n${view.context.getString(it.description)}"
-	}
+	private var pagination = ItemPagination<ItemCard>(emptyList()) { "${it.title}\n${it.description}" }
 	private var listMode = savedState?.getBoolean("items.listMode") ?: false
+	private var filter = savedState?.getString("items.filter")?.let(ItemFilter::valueOf) ?: ItemFilter.ALL
+	private var pendingPageIndex: Int? = savedState?.getInt("items.page")
+	private var itemsJob: Job? = null
 
 	init {
 		list.layoutManager = layout
 		list.adapter = adapter
 		search.setText(savedState?.getString("items.query").orEmpty())
-		pagination.search(search.text.toString())
-		pagination.goToPage(savedState?.getInt("items.page") ?: 0)
 		search.doAfterTextChanged {
 			pagination.search(it.toString())
 			render()
@@ -54,7 +69,13 @@ class ItemsPage(private val view: View, window: Window, savedState: Bundle?) {
 		}
 		previous.setOnClickListener { changePage(-1) }
 		next.setOnClickListener { changePage(1) }
-		render()
+		observeItems()
+	}
+
+	fun setFilter(newFilter: ItemFilter) {
+		if (filter == newFilter) return
+		filter = newFilter
+		observeItems()
 	}
 
 	fun focusSearch() {
@@ -66,6 +87,36 @@ class ItemsPage(private val view: View, window: Window, savedState: Bundle?) {
 		state.putString("items.query", search.text.toString())
 		state.putBoolean("items.listMode", listMode)
 		state.putInt("items.page", pagination.pageIndex)
+		state.putString("items.filter", filter.name)
+	}
+
+	private fun observeItems() {
+		itemsJob?.cancel()
+		val context = view.context
+		itemsJob = lifecycleOwner.lifecycleScope.launch {
+			when (filter) {
+				ItemFilter.ALL -> combine(
+					repository.observeLostItems(),
+					repository.observeFoundItems()
+				) { lost, found ->
+					lost.map { it.toItemCard(context) } + found.map { it.toItemCard(context) }
+				}
+				ItemFilter.LOST -> repository.observeLostItems().map { items ->
+					items.map { it.toItemCard(context) }
+				}
+				ItemFilter.FOUND -> repository.observeFoundItems().map { items ->
+					items.map { it.toItemCard(context) }
+				}
+			}.collect { items ->
+				pagination = ItemPagination(items) { "${it.title}\n${it.description}" }
+				pagination.search(search.text.toString())
+				pendingPageIndex?.let {
+					pagination.goToPage(it)
+					pendingPageIndex = null
+				}
+				render()
+			}
+		}
 	}
 
 	private fun changePage(offset: Int) {

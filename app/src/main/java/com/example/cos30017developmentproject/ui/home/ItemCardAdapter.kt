@@ -13,8 +13,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.R
 
 /** One card layout and one binding path for home, grid and list presentations. */
-class ItemCardAdapter(items: List<SampleItem> = emptyList()) :
-	ListAdapter<SampleItem, ItemCardAdapter.ItemViewHolder>(ItemDiff) {
+class ItemCardAdapter(items: List<ItemCard> = emptyList()) :
+	ListAdapter<ItemCard, ItemCardAdapter.ItemViewHolder>(ItemDiff) {
 	private var listMode = false
 
 	init {
@@ -53,15 +53,12 @@ class ItemCardAdapter(items: List<SampleItem> = emptyList()) :
 			}
 		}
 
-		fun bind(item: SampleItem) {
+		fun bind(item: ItemCard) {
 			val context = itemView.context
 			image.setImageResource(item.image)
-			image.contentDescription = context.getString(
-				R.string.item_image_description,
-				context.getString(item.title)
-			)
-			title.setText(item.title)
-			description.setText(item.description)
+			image.contentDescription = context.getString(R.string.item_image_description, item.title)
+			title.text = item.title
+			description.text = item.description
 			type.setText(if (item.isFound) R.string.found else R.string.lost)
 			type.setTextColor(
 				ContextCompat.getColor(
@@ -82,8 +79,9 @@ class ItemCardAdapter(items: List<SampleItem> = emptyList()) :
 		)
 	)
 
-	private object ItemDiff : DiffUtil.ItemCallback<SampleItem>() {
-		override fun areItemsTheSame(old: SampleItem, new: SampleItem) = old.title == new.title
-		override fun areContentsTheSame(old: SampleItem, new: SampleItem) = old == new
+	private object ItemDiff : DiffUtil.ItemCallback<ItemCard>() {
+		override fun areItemsTheSame(old: ItemCard, new: ItemCard) =
+			old.id == new.id && old.isFound == new.isFound
+		override fun areContentsTheSame(old: ItemCard, new: ItemCard) = old == new
 	}
 }
