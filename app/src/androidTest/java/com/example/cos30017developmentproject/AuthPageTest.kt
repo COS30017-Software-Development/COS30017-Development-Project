@@ -103,6 +103,7 @@ class AuthPageTest {
 			scenario.onActivity { activity ->
 				val requirements = activity.findViewById<View>(R.id.auth_password_requirements)
 				val password = activity.findViewById<EditText>(R.id.auth_password)
+				val confirmation = activity.findViewById<EditText>(R.id.auth_confirm_password)
 				val rules = listOf(
 					R.id.password_requirement_length,
 					R.id.password_requirement_digit,
@@ -118,8 +119,9 @@ class AuthPageTest {
 				assertEquals(View.VISIBLE, requirements.visibility)
 				rules.forEach { assertEquals(expected(R.color.text_secondary), color(it)) }
 				password.setText("a")
+				assertEquals(expected(R.color.brand_red_accessible), color(R.id.password_requirement_match))
 				assertEquals(
-					expected(R.color.password_requirement_met),
+					expected(R.color.text_secondary),
 					color(R.id.password_requirement_lowercase)
 				)
 				rules.filter { it != R.id.password_requirement_lowercase }.forEach {
@@ -129,10 +131,12 @@ class AuthPageTest {
 					password.setText(value)
 					rules.forEach {
 						assertEquals(
-							expected(R.color.password_requirement_met), color(it)
+							expected(R.color.text_secondary), color(it)
 						)
 					}
 				}
+				confirmation.setText(password.text)
+				assertEquals(expected(R.color.text_secondary), color(R.id.password_requirement_match))
 				password.setText("Aa1!abcdefghijklM")
 				assertEquals(
 					expected(R.color.brand_red_accessible), color(R.id.password_requirement_length)
@@ -150,7 +154,7 @@ class AuthPageTest {
 	}
 
 	@Test
-	fun studentIdFiltersNonDigitsAndPasswordVisibilityStaysInSync() {
+	fun signUpErrorsClearOnEditAndPasswordVisibilityStaysInSync() {
 		ActivityScenario.launch(AuthActivity::class.java).use { scenario ->
 			scenario.onActivity { activity ->
 				activity.findViewById<View>(R.id.auth_switch).performClick()
@@ -160,24 +164,28 @@ class AuthPageTest {
 				val studentLayout = activity.findViewById<com.google.android.material.textfield.TextInputLayout>(
 					R.id.auth_student_id_layout
 				)
-				assertEquals(
-					activity.getString(R.string.auth_student_id_error), studentLayout.error
-				)
-				studentId.text.replace(0, studentId.length(), "012345678")
-				assertNull(studentLayout.error)
-				studentId.text.append("9")
-				assertEquals("0123456789", studentId.text.toString())
-				assertEquals(
-					activity.getString(R.string.auth_student_id_error), studentLayout.error
-				)
-				assertFalse(activity.findViewById<View>(R.id.auth_submit).isEnabled)
-				studentId.text.delete(9, 10)
 				assertNull(studentLayout.error)
 
 				val password = activity.findViewById<EditText>(R.id.auth_password)
 				val confirmation = activity.findViewById<EditText>(R.id.auth_confirm_password)
 				password.setText("Aa1!abcd")
 				confirmation.setText("Aa1!abcd")
+				assertTrue(activity.findViewById<View>(R.id.auth_submit).isEnabled)
+				activity.findViewById<View>(R.id.auth_submit).performClick()
+				assertEquals(activity.getString(R.string.auth_student_id_error), studentLayout.error)
+				studentId.text.append("6")
+				assertNull(studentLayout.error)
+
+				val email = activity.findViewById<EditText>(R.id.auth_email)
+				email.setText("invalid-email")
+				activity.findViewById<View>(R.id.auth_submit).performClick()
+				assertEquals(activity.getString(R.string.auth_email_error), activity.findViewById<com.google.android.material.textfield.TextInputLayout>(
+					R.id.auth_email_layout
+				).error)
+				email.append("@example.com")
+				assertNull(activity.findViewById<com.google.android.material.textfield.TextInputLayout>(
+					R.id.auth_email_layout
+				).error)
 				password.setSelection(3)
 				for (layoutId in listOf(
 					R.id.auth_password_layout, R.id.auth_confirm_password_layout

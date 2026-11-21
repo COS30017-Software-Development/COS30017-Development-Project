@@ -60,14 +60,16 @@ class AuthActivity : AppCompatActivity() {
 			R.id.auth_password, R.id.auth_confirm_password
 		)) {
 			findViewById<EditText>(fieldId).doAfterTextChanged {
-				if (fieldId == R.id.auth_password) updatePasswordRequirements()
+				when (fieldId) {
+					R.id.auth_name -> layout(R.id.auth_name_layout).error = null
+					R.id.auth_student_id -> layout(R.id.auth_student_id_layout).error = null
+					R.id.auth_email -> layout(R.id.auth_email_layout).error = null
+				}
+				if (fieldId == R.id.auth_password || fieldId == R.id.auth_confirm_password) {
+					updatePasswordRequirements()
+				}
 				updateSubmitState()
 			}
-		}
-		findViewById<EditText>(R.id.auth_student_id).doAfterTextChanged { text ->
-			findViewById<TextInputLayout>(R.id.auth_student_id_layout).error = if (!text.isNullOrEmpty() && text.length != 9) getString(
-				R.string.auth_student_id_error
-			) else null
 		}
 		setupPasswordVisibility()
 		findViewById<View>(R.id.auth_submit).setOnClickListener { submit() }
@@ -98,11 +100,9 @@ class AuthActivity : AppCompatActivity() {
 		val emailValid = AuthValidator.isEmailValid(text(R.id.auth_email))
 		val password = text(R.id.auth_password)
 		findViewById<View>(R.id.auth_submit).isEnabled = if (registering) {
-			AuthValidator.isNameValid(text(R.id.auth_name)) &&
-				AuthValidator.isStudentIdValid(text(R.id.auth_student_id)) &&
-				emailValid && AuthValidator.isPasswordValid(password) &&
+			AuthValidator.isPasswordValid(password) &&
 				password == text(R.id.auth_confirm_password)
-		} else emailValid && password.isNotEmpty()
+		} else emailValid && AuthValidator.isPasswordValid(password)
 	}
 
 	private fun submit() {
@@ -208,6 +208,7 @@ class AuthActivity : AppCompatActivity() {
 
 	private fun updatePasswordRequirements() {
 		val password = findViewById<EditText>(R.id.auth_password).text.toString()
+		val confirmation = findViewById<EditText>(R.id.auth_confirm_password).text.toString()
 		val requirements = listOf(
 			R.id.password_requirement_length to (password.length in 8 .. 16),
 			R.id.password_requirement_digit to password.any { it in '0' .. '9' },
@@ -217,11 +218,15 @@ class AuthActivity : AppCompatActivity() {
 		for ((id, met) in requirements) {
 			val color = when {
 				password.isEmpty() -> R.color.text_secondary
-				met -> R.color.password_requirement_met
+				met -> R.color.text_secondary
 				else -> R.color.brand_red_accessible
 			}
 			findViewById<TextView>(id).setTextColor(ContextCompat.getColor(this, color))
 		}
+		val matchColor = if (password == confirmation) R.color.text_secondary else R.color.brand_red_accessible
+		findViewById<TextView>(R.id.password_requirement_match).setTextColor(
+			ContextCompat.getColor(this, matchColor)
+		)
 	}
 
 }
