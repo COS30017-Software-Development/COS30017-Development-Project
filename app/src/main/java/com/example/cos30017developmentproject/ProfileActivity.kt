@@ -2,9 +2,13 @@ package com.example.cos30017developmentproject
 
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.app.Dialog
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
@@ -113,14 +117,33 @@ class ProfileActivity : AppCompatActivity() {
 		val avatar = findViewById<ImageView>(R.id.profile_avatar)
 		val file = AvatarStorage.fileFor(this, path)
 		if (file == null) {
-			val padding = (28 * resources.displayMetrics.density).toInt()
+			val padding = (84 * resources.displayMetrics.density).toInt()
 			avatar.setPadding(padding, padding, padding, padding)
 			avatar.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.white))
 			avatar.setImageResource(R.drawable.ic_profile)
+			avatar.setOnClickListener(null)
+			avatar.isClickable = false
 		} else {
 			avatar.setPadding(0, 0, 0, 0)
 			avatar.imageTintList = null
-			avatar.setImageURI(Uri.fromFile(file))
+			val uri = Uri.fromFile(file)
+			avatar.setImageURI(uri)
+			avatar.setOnClickListener { showAvatarViewer(uri) }
+			avatar.isClickable = true
+		}
+	}
+
+	private fun showAvatarViewer(uri: Uri) {
+		val dialog = Dialog(this, android.R.style.Theme_Material_Light_NoActionBar_Fullscreen)
+		val content = layoutInflater.inflate(R.layout.dialog_avatar_viewer, null)
+		content.findViewById<ImageView>(R.id.avatar_viewer_image).setImageURI(uri)
+		content.setOnClickListener { dialog.dismiss() }
+		dialog.setContentView(content)
+		dialog.show()
+		dialog.window?.apply {
+			setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+			setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+			clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
 		}
 	}
 

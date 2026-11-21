@@ -85,6 +85,8 @@ Bring it home.</string >
 	<string name = "profile_email_label" >Email</string >
 	<string name = "profile_student_id_label" >Student ID</string >
 	<string name = "profile_default_avatar" >Default profile avatar</string >
+	<string name="profile_avatar_viewer_image">Full profile avatar</string>
+	<string name="profile_avatar_viewer_close">Close full profile avatar</string>
 	<string name = "profile_edit" >Edit profile</string >
 	<string name = "profile_edit_title" >Edit profile</string >
 	<string name = "profile_edit_name_help" >Choose a new profile photo and update your display name.</string >
