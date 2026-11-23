@@ -121,7 +121,7 @@ class ProfileActivity : AppCompatActivity() {
 		val avatar = findViewById<ImageView>(R.id.profile_avatar)
 		val file = AvatarStorage.fileFor(this, path)
 		if (file == null) {
-			val padding = (20 * resources.displayMetrics.density).toInt()
+			val padding = (30 * resources.displayMetrics.density).toInt()
 			avatar.setPadding(padding, padding, padding, padding)
 			avatar.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.white))
 			avatar.setImageResource(R.drawable.ic_profile)
