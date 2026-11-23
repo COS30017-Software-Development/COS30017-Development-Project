@@ -66,6 +66,9 @@ class ProfileActivity : AppCompatActivity() {
 		findViewById<View>(R.id.profile_edit).setOnClickListener {
 			startActivity(Intent(this, EditProfileActivity::class.java))
 		}
+		findViewById<View>(R.id.profile_my_posts).setOnClickListener {
+			startActivity(Intent(this, MyPostsActivity::class.java))
+		}
 		findViewById<View>(R.id.profile_logout).setOnClickListener {
 			sessionManager.logout()
 			openLogin()
@@ -75,6 +78,10 @@ class ProfileActivity : AppCompatActivity() {
 				R.id.nav_profile -> true
 				R.id.nav_home, R.id.nav_items -> {
 					openMain(item.itemId)
+					false
+				}
+				R.id.nav_post -> {
+					openPost()
 					false
 				}
 				else -> {
@@ -89,6 +96,8 @@ class ProfileActivity : AppCompatActivity() {
 				R.id.drawer_profile -> true
 				R.id.drawer_home -> openMain(R.id.nav_home)
 				R.id.drawer_lost, R.id.drawer_found, R.id.drawer_search -> openMain(R.id.nav_items)
+				R.id.drawer_post -> openPost()
+				R.id.drawer_my_posts -> startActivity(Intent(this, MyPostsActivity::class.java))
 				else -> showPreviewMessage(item.title.toString())
 			}
 			false
@@ -227,6 +236,11 @@ class ProfileActivity : AppCompatActivity() {
 			addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
 		})
 		finish()
+	}
+
+	private fun openPost() {
+		val destination = if (sessionManager.userId == null) AuthActivity::class.java else AddItemActivity::class.java
+		startActivity(Intent(this, destination))
 	}
 
 	private fun showPreviewMessage(destination: String) {

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:id="@+id/my_posts_root"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:background="@color/surface_soft"
+	android:orientation="vertical">
+
+	<com.google.android.material.appbar.MaterialToolbar
+		android:id="@+id/my_posts_toolbar"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:background="@color/white"
+		android:minHeight="56dp"
+		app:navigationIcon="@drawable/ic_back"
+		app:navigationContentDescription="@string/back_to_items"
+		app:title="@string/my_posts_title"
+		app:titleTextColor="@color/black" />
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:background="@color/white"
+		android:orientation="horizontal"
+		android:paddingHorizontal="16dp"
+		android:paddingBottom="12dp">
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/my_posts_filter_all"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:text="@string/filter_all"
+			android:textAllCaps="false"
+			android:textColor="@color/white"
+			app:backgroundTint="@color/brand_red_accessible"
+			app:cornerRadius="12dp" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/my_posts_filter_lost"
+			style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="8dp"
+			android:layout_weight="1"
+			android:text="@string/lost"
+			android:textAllCaps="false"
+			android:textColor="@color/brand_red_accessible"
+			app:cornerRadius="12dp"
+			app:strokeColor="@color/brand_red_accessible" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/my_posts_filter_found"
+			style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="8dp"
+			android:layout_weight="1"
+			android:text="@string/found"
+			android:textAllCaps="false"
+			android:textColor="@color/brand_red_accessible"
+			app:cornerRadius="12dp"
+			app:strokeColor="@color/brand_red_accessible" />
+	</LinearLayout>
+
+	<FrameLayout
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1">
+
+		<androidx.recyclerview.widget.RecyclerView
+			android:id="@+id/my_posts_list"
+			android:layout_width="match_parent"
+			android:layout_height="match_parent"
+			android:clipToPadding="false"
+			android:padding="14dp" />
+
+		<TextView
+			android:id="@+id/my_posts_empty"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_gravity="center"
+			android:gravity="center"
+			android:padding="24dp"
+			android:text="@string/my_posts_empty"
+			android:textColor="@color/text_secondary"
+			android:textSize="14sp"
+			android:visibility="gone" />
+	</FrameLayout>
+</LinearLayout>

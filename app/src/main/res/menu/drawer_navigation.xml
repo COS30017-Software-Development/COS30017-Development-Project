@@ -21,6 +21,10 @@
 			android:icon = "@drawable/ic_post"
 			android:title = "@string/post" />
 		<item
+			android:id = "@+id/drawer_my_posts"
+			android:icon = "@drawable/ic_items"
+			android:title = "@string/my_posts" />
+		<item
 			android:id = "@+id/drawer_profile"
 			android:icon = "@drawable/ic_profile"
 			android:title = "@string/profile" />

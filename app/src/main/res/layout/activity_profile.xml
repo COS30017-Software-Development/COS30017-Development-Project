@@ -89,6 +89,19 @@
 					app:cornerRadius="12dp" />
 
 				<com.google.android.material.button.MaterialButton
+					android:id="@+id/profile_my_posts"
+					style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:layout_marginTop="12dp"
+					android:minHeight="56dp"
+					android:text="@string/my_posts"
+					android:textAllCaps="false"
+					android:textColor="@color/brand_red_accessible"
+					app:cornerRadius="12dp"
+					app:strokeColor="@color/brand_red_accessible" />
+
+				<com.google.android.material.button.MaterialButton
 					android:id="@+id/profile_logout"
 					style="@style/Widget.MaterialComponents.Button.OutlinedButton"
 					android:layout_width="match_parent"

@@ -148,6 +148,8 @@ class MainActivity : AppCompatActivity() {
 				itemsPage.focusSearch()
 			} else if (item.itemId == R.id.drawer_post) {
 				openPost()
+			} else if (item.itemId == R.id.drawer_my_posts) {
+				openMyPosts()
 			} else if (item.itemId == R.id.drawer_profile) {
 				openProfile()
 			} else showPreviewMessage(item.title.toString())
@@ -201,6 +203,15 @@ class MainActivity : AppCompatActivity() {
 			startActivity(Intent(this, AuthActivity::class.java))
 		} else {
 			startActivity(Intent(this, AddItemActivity::class.java))
+		}
+	}
+
+	private fun openMyPosts() {
+		bottomNavigation.selectedItemId = R.id.nav_home
+		if (SessionManager(this).userId == null) {
+			startActivity(Intent(this, AuthActivity::class.java))
+		} else {
+			startActivity(Intent(this, MyPostsActivity::class.java))
 		}
 	}
 
