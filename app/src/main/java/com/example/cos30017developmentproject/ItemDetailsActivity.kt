@@ -1,22 +1,31 @@
 package com.example.cos30017developmentproject
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 
 class ItemDetailsActivity : AppCompatActivity() {
 	private lateinit var repository: LostAndFoundRepository
+	private val editItem = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+		if (result.resultCode == RESULT_OK) {
+			loadItem(intent.getLongExtra(EXTRA_ITEM_ID, INVALID_ITEM_ID), intent.getStringExtra(EXTRA_ITEM_TYPE).orEmpty())
+		}
+	}
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -46,10 +55,10 @@ class ItemDetailsActivity : AppCompatActivity() {
 		lifecycleScope.launch {
 			val item = when (type) {
 				TYPE_LOST -> repository.getLostItem(id)?.let {
-					ItemDetails(it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId)
+					ItemDetails(it.id, it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId)
 				}
 				TYPE_FOUND -> repository.getFoundItem(id)?.let {
-					ItemDetails(it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId)
+					ItemDetails(it.id, it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId)
 				}
 				else -> null
 			} ?: run {
@@ -77,6 +86,66 @@ class ItemDetailsActivity : AppCompatActivity() {
 		findViewById<TextView>(R.id.item_details_description).text = item.description
 		findViewById<View>(R.id.item_details_poster_section).isVisible = username != null
 		findViewById<TextView>(R.id.item_details_poster).text = username.orEmpty()
+		findViewById<View>(R.id.item_owner_actions).isVisible =
+			SessionManager(this).userId == item.postedByUserId
+		findViewById<View>(R.id.edit_item).setOnClickListener { openEdit(item.id, type) }
+		findViewById<View>(R.id.delete_item).setOnClickListener { confirmDelete(item.id, type) }
+	}
+
+	private fun openEdit(id: Long, type: String) {
+		lifecycleScope.launch {
+			if (!isCurrentUserOwner(id, type)) {
+				showPermissionDenied()
+				return@launch
+			}
+			editItem.launch(Intent(this@ItemDetailsActivity, EditItemActivity::class.java).apply {
+				putExtra(EXTRA_ITEM_ID, id)
+				putExtra(EXTRA_ITEM_TYPE, type)
+			})
+		}
+	}
+
+	private fun confirmDelete(id: Long, type: String) {
+		MaterialAlertDialogBuilder(this)
+			.setTitle(R.string.delete_item_title)
+			.setMessage(R.string.delete_item_message)
+			.setNegativeButton(R.string.cancel, null)
+			.setPositiveButton(R.string.delete) { _, _ -> deleteItem(id, type) }
+			.show()
+	}
+
+	private fun deleteItem(id: Long, type: String) {
+		lifecycleScope.launch {
+			val userId = SessionManager(this@ItemDetailsActivity).userId
+			val deleted = when (type) {
+				TYPE_LOST -> repository.getLostItem(id)?.takeIf { it.postedByUserId == userId }?.let {
+					repository.deleteLostItem(it)
+					true
+				} ?: false
+				TYPE_FOUND -> repository.getFoundItem(id)?.takeIf { it.postedByUserId == userId }?.let {
+					repository.deleteFoundItem(it)
+					true
+				} ?: false
+				else -> false
+			}
+			if (deleted) {
+				Toast.makeText(this@ItemDetailsActivity, R.string.item_deleted, Toast.LENGTH_SHORT).show()
+				finish()
+			} else showPermissionDenied()
+		}
+	}
+
+	private suspend fun isCurrentUserOwner(id: Long, type: String): Boolean {
+		val userId = SessionManager(this).userId ?: return false
+		return when (type) {
+			TYPE_LOST -> repository.getLostItem(id)?.postedByUserId == userId
+			TYPE_FOUND -> repository.getFoundItem(id)?.postedByUserId == userId
+			else -> false
+		}
+	}
+
+	private fun showPermissionDenied() {
+		Toast.makeText(this, R.string.item_action_not_allowed, Toast.LENGTH_SHORT).show()
 	}
 
 	private fun showItemNotFound() {
@@ -85,6 +154,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 	}
 
 	private data class ItemDetails(
+		val id: Long,
 		val title: String,
 		val description: String,
 		val location: String,

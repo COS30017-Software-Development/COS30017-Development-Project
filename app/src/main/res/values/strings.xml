@@ -111,4 +111,17 @@ Bring it home.</string >
 	<string name="back_to_items">Back to items</string>
 	<string name="item_not_found">This item is no longer available.</string>
 	<string name="item_type_format">%1$s item</string>
+	<string name="edit_item">Edit</string>
+	<string name="delete">Delete</string>
+	<string name="cancel">Cancel</string>
+	<string name="delete_item_title">Delete item?</string>
+	<string name="delete_item_message">This action cannot be undone.</string>
+	<string name="item_deleted">Item deleted.</string>
+	<string name="item_action_not_allowed">You can only manage your own item.</string>
+	<string name="edit_item_title">Edit item</string>
+	<string name="item_name">Item name</string>
+	<string name="item_image_name">Image resource name</string>
+	<string name="save_changes">Save changes</string>
+	<string name="item_updated">Item updated.</string>
+	<string name="item_fields_required">Complete all item fields.</string>
 </resources >
