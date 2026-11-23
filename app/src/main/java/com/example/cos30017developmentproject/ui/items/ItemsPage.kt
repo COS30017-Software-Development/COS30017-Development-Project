@@ -1,5 +1,6 @@
 package com.example.cos30017developmentproject.ui.items
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.Window
@@ -16,6 +17,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.example.cos30017developmentproject.R
+import com.example.cos30017developmentproject.ItemDetailsActivity
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
 import com.example.cos30017developmentproject.ui.home.ItemCardAdapter
 import com.example.cos30017developmentproject.ui.home.ItemCard
@@ -40,7 +42,15 @@ class ItemsPage(
 	private val toggle = view.findViewById<ImageButton>(R.id.toggle_item_layout)
 	private val previous = view.findViewById<ImageButton>(R.id.previous_page)
 	private val next = view.findViewById<ImageButton>(R.id.next_page)
-	private val adapter = ItemCardAdapter()
+	private val adapter = ItemCardAdapter { item ->
+		view.context.startActivity(Intent(view.context, ItemDetailsActivity::class.java).apply {
+			putExtra(ItemDetailsActivity.EXTRA_ITEM_ID, item.id)
+			putExtra(
+				ItemDetailsActivity.EXTRA_ITEM_TYPE,
+				if (item.isFound) ItemDetailsActivity.TYPE_FOUND else ItemDetailsActivity.TYPE_LOST
+			)
+		})
+	}
 	private val layout = GridLayoutManager(view.context, 2)
 	private var pagination = ItemPagination<ItemCard>(emptyList()) { "${it.title}\n${it.description}" }
 	private var listMode = savedState?.getBoolean("items.listMode") ?: false

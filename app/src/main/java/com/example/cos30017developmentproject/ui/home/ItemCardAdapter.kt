@@ -13,7 +13,10 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.R
 
 /** One card layout and one binding path for home, grid and list presentations. */
-class ItemCardAdapter(items: List<ItemCard> = emptyList()) :
+class ItemCardAdapter(
+	items: List<ItemCard> = emptyList(),
+	private val onItemClick: ((ItemCard) -> Unit)? = null
+) :
 	ListAdapter<ItemCard, ItemCardAdapter.ItemViewHolder>(ItemDiff) {
 	private var listMode = false
 
@@ -29,7 +32,11 @@ class ItemCardAdapter(items: List<ItemCard> = emptyList()) :
 
 	override fun getItemViewType(position: Int) = if (listMode) 1 else 0
 
-	class ItemViewHolder(view: View, listMode: Boolean) : RecyclerView.ViewHolder(view) {
+	class ItemViewHolder(
+		view: View,
+		listMode: Boolean,
+		private val onItemClick: ((ItemCard) -> Unit)?
+	) : RecyclerView.ViewHolder(view) {
 		private val image: ImageView = view.findViewById(R.id.item_image)
 		private val title: TextView = view.findViewById(R.id.item_title)
 		private val description: TextView = view.findViewById(R.id.item_description)
@@ -65,12 +72,14 @@ class ItemCardAdapter(items: List<ItemCard> = emptyList()) :
 					context, if (item.isFound) R.color.black else R.color.brand_red_accessible
 				)
 			)
+			itemView.setOnClickListener(onItemClick?.let { listener -> { listener(item) } })
 		}
 	}
 
 	override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = ItemViewHolder(
 		LayoutInflater.from(parent.context).inflate(R.layout.component_item_card, parent, false),
-		viewType == 1
+		viewType == 1,
+		onItemClick
 	)
 
 	override fun onBindViewHolder(holder: ItemViewHolder, position: Int) = holder.bind(
