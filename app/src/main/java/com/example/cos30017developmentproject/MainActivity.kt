@@ -21,6 +21,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.ui.home.ItemCardAdapter
 import com.example.cos30017developmentproject.ui.home.toItemCard
 import com.example.cos30017developmentproject.ui.items.ItemFilter
@@ -114,8 +115,13 @@ class MainActivity : AppCompatActivity() {
 					true
 				}
 
-				R.id.nav_post, R.id.nav_profile -> {
-					openLogin()
+				R.id.nav_post -> {
+					openPost()
+					false
+				}
+
+				R.id.nav_profile -> {
+					openProfile()
 					false
 				}
 
@@ -140,8 +146,10 @@ class MainActivity : AppCompatActivity() {
 			} else if (item.itemId == R.id.drawer_search) {
 				showItems(ItemFilter.ALL)
 				itemsPage.focusSearch()
-			} else if (item.itemId == R.id.drawer_post || item.itemId == R.id.drawer_profile) {
-				openLogin()
+			} else if (item.itemId == R.id.drawer_post) {
+				openPost()
+			} else if (item.itemId == R.id.drawer_profile) {
+				openProfile()
 			} else showPreviewMessage(item.title.toString())
 			false
 		}
@@ -187,12 +195,22 @@ class MainActivity : AppCompatActivity() {
 		findViewById<NestedScrollView>(R.id.home_scroll).smoothScrollTo(0, 0)
 	}
 
-	private fun openLogin() {
+	private fun openPost() {
 		bottomNavigation.selectedItemId = R.id.nav_home
-		val destination = if (com.example.cos30017developmentproject.auth.SessionManager(this).userId == null) {
-			AuthActivity::class.java
-		} else ProfileActivity::class.java
-		startActivity(Intent(this, destination))
+		if (SessionManager(this).userId == null) {
+			startActivity(Intent(this, AuthActivity::class.java))
+		} else {
+			startActivity(Intent(this, AddItemActivity::class.java))
+		}
+	}
+
+	private fun openProfile() {
+		bottomNavigation.selectedItemId = R.id.nav_home
+		if (SessionManager(this).userId == null) {
+			startActivity(Intent(this, AuthActivity::class.java))
+		} else {
+			startActivity(Intent(this, ProfileActivity::class.java))
+		}
 	}
 
 	private fun showPreviewMessage(destination: String) {
