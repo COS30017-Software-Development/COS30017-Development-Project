@@ -72,10 +72,13 @@ local.properties
 # Codex
 .codex/
 .codex-home/
+codex-home/
 
 # Claude Code
 .claude/
 .claude-home/
+CLAUDE.local.md
+.claude/settings.local.json
 
 # GitHub Copilot
 .copilot/
