@@ -213,7 +213,7 @@ class EditProfileActivity : AppCompatActivity() {
 
 	private fun showDefaultAvatar() {
 		val avatar = findViewById<ImageView>(R.id.profile_avatar_input)
-		val padding = (30 * resources.displayMetrics.density).toInt()
+		val padding = (40 * resources.displayMetrics.density).toInt()
 		avatar.setPadding(padding, padding, padding, padding)
 		avatar.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(this, R.color.white))
 		avatar.setImageResource(R.drawable.ic_profile)
