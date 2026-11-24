@@ -19,6 +19,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.cos30017developmentproject.auth.AuthValidator
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.auth.UserRepository
+import com.example.cos30017developmentproject.data.local.UserRole
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.launch
@@ -36,7 +37,7 @@ class AuthActivity : AppCompatActivity() {
 		repository = UserRepository(AppDatabase.getInstance(this).userDao())
 		sessionManager = SessionManager(this)
 		if (sessionManager.userId != null) {
-			openProfile()
+			openAfterLogin()
 			return
 		}
 		ViewCompat.setAccessibilityHeading(findViewById(R.id.auth_title), true)
@@ -123,8 +124,8 @@ class AuthActivity : AppCompatActivity() {
 			}
 			when (result) {
 				is UserRepository.AuthResult.Success -> {
-					sessionManager.login(result.user.id)
-					openProfile()
+					sessionManager.login(result.user.id, result.user.role)
+					openAfterLogin()
 				}
 				UserRepository.AuthResult.DuplicateEmail -> {
 					layout(R.id.auth_email_layout).error = getString(R.string.auth_duplicate_email_error)
@@ -187,6 +188,16 @@ class AuthActivity : AppCompatActivity() {
 
 	private fun openProfile() {
 		startActivity(Intent(this, ProfileActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
+		finish()
+	}
+
+	private fun openAfterLogin() {
+		val destination = if (sessionManager.role == UserRole.ADMIN) {
+			AdminDashboardActivity::class.java
+		} else {
+			ProfileActivity::class.java
+		}
+		startActivity(Intent(this, destination).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
 		finish()
 	}
 

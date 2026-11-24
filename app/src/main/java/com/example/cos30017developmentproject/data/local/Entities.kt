@@ -14,7 +14,8 @@ data class UserEntity(
 	@ColumnInfo(name = "student_id") val studentId: String,
 	@ColumnInfo(name = "avatar_path") val avatarPath: String? = null,
 	@ColumnInfo(name = "password_hash") val passwordHash: ByteArray? = null,
-	@ColumnInfo(name = "password_salt") val passwordSalt: ByteArray? = null
+	@ColumnInfo(name = "password_salt") val passwordSalt: ByteArray? = null,
+	@ColumnInfo(name = "role") val role: String = UserRole.STUDENT
 )
 
 @Entity(
@@ -56,3 +57,8 @@ data class FoundItemEntity(
 	@ColumnInfo(name = "image_name") val imageName: String,
 	@ColumnInfo(name = "posted_by_user_id") val postedByUserId: Long
 )
+
+object UserRole {
+	const val STUDENT = "STUDENT"
+	const val ADMIN = "ADMIN"
+}

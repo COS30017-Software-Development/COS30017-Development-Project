@@ -8,16 +8,26 @@ class SessionManager(context: Context) {
 	val userId: Long?
 		get() = preferences.getLong(KEY_USER_ID, NO_USER).takeUnless { it == NO_USER }
 
-	fun login(userId: Long) {
-		preferences.edit().putLong(KEY_USER_ID, userId).apply()
+	val role: String
+		get() = preferences.getString(KEY_ROLE, "STUDENT") ?: "STUDENT"
+
+	fun login(userId: Long, role: String = "STUDENT") {
+		preferences.edit()
+			.putLong(KEY_USER_ID, userId)
+			.putString(KEY_ROLE, role)
+			.apply()
 	}
 
 	fun logout() {
-		preferences.edit().remove(KEY_USER_ID).apply()
+		preferences.edit()
+			.remove(KEY_USER_ID)
+			.remove(KEY_ROLE)
+			.apply()
 	}
 
 	private companion object {
 		const val KEY_USER_ID = "user_id"
+		const val KEY_ROLE = "role"
 		const val NO_USER = -1L
 	}
 }

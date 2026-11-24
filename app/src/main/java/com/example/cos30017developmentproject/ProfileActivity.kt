@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.app.Dialog
 import android.graphics.Color
+import android.annotation.SuppressLint
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
@@ -29,6 +30,7 @@ import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.auth.UserRepository
 import com.example.cos30017developmentproject.auth.AvatarStorage
 import com.example.cos30017developmentproject.data.local.AppDatabase
+import com.example.cos30017developmentproject.data.local.UserRole
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigation.NavigationView
 import kotlinx.coroutines.launch
@@ -44,6 +46,11 @@ class ProfileActivity : AppCompatActivity() {
 		userId = sessionManager.userId
 		if (userId == null) {
 			openLogin()
+			return
+		}
+		if (sessionManager.role == UserRole.ADMIN) {
+			startActivity(Intent(this, AdminDashboardActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
+			finish()
 			return
 		}
 		enableEdgeToEdge()
@@ -146,6 +153,7 @@ class ProfileActivity : AppCompatActivity() {
 		}
 	}
 
+	@SuppressLint("GestureBackNavigation")
 	private fun showAvatarViewer(uri: Uri, sourceAvatar: View) {
 		val dialog = Dialog(this, android.R.style.Theme_Material_Light_NoActionBar_Fullscreen)
 		val content = layoutInflater.inflate(R.layout.dialog_avatar_viewer, null)

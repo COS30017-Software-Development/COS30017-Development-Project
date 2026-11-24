@@ -10,7 +10,7 @@ import com.example.cos30017developmentproject.auth.PasswordHasher
 
 @Database(
 	entities = [UserEntity::class, LostItemEntity::class, FoundItemEntity::class],
-	version = 4,
+	version = 5,
 	exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -37,6 +37,12 @@ abstract class AppDatabase : RoomDatabase() {
 				db.execSQL("ALTER TABLE users ADD COLUMN avatar_path TEXT")
 			}
 		}
+		val MIGRATION_4_5 = object : Migration(4, 5) {
+			override fun migrate(db: SupportSQLiteDatabase) {
+				db.execSQL("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'STUDENT'")
+				insertAdminUser(db)
+			}
+		}
 
 		@Volatile
 		private var instance: AppDatabase? = null
@@ -46,7 +52,7 @@ abstract class AppDatabase : RoomDatabase() {
 				context.applicationContext,
 				AppDatabase::class.java,
 				DATABASE_NAME
-			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).addCallback(SeedDataCallback()).build().also { instance = it }
+			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).addCallback(SeedDataCallback()).build().also { instance = it }
 		}
 	}
 }
@@ -56,6 +62,7 @@ private class SeedDataCallback : RoomDatabase.Callback() {
 		super.onCreate(db)
 		insertSeedUser(db, 1, "user1", "user1@swinburne.edu.my", "100000001", "User1@Pass123")
 		insertSeedUser(db, 2, "user2", "user2@swinburne.edu.my", "100000002", "User2@Pass123")
+		insertAdminUser(db)
 
 		// These records preserve the existing SampleItem titles, descriptions, types, and drawable names.
 		db.execSQL("INSERT INTO lost_items (title, description, location, category, image_name, posted_by_user_id) VALUES ('Water bottle', 'Lost in a lecture room. A reusable bottle with a black lid.', 'Lecture room', 'Bottle', 'sample_bottle', 1)")
@@ -101,5 +108,29 @@ private fun setSeedUserPassword(db: SupportSQLiteDatabase, email: String, passwo
 		bindBlob(2, storedPassword.salt)
 		bindString(3, email)
 		executeUpdateDelete()
+	}
+}
+
+private fun insertAdminUser(db: SupportSQLiteDatabase) {
+	val email = "admin@campus.local"
+	val existing = db.compileStatement(
+		"SELECT COUNT(*) FROM users WHERE email = ?"
+	).apply { bindString(1, email) }.simpleQueryForLong()
+	if (existing > 0) {
+		db.execSQL("UPDATE users SET role = 'ADMIN' WHERE email = 'admin@campus.local'")
+		return
+	}
+	val storedPassword = PasswordHasher().hash("Admin1@Pass".toCharArray())
+	db.compileStatement(
+		"INSERT INTO users (id, username, email, student_id, password_hash, password_salt, role) VALUES (?, ?, ?, ?, ?, ?, ?)"
+	).apply {
+		bindLong(1, 3)
+		bindString(2, "Administrator")
+		bindString(3, email)
+		bindString(4, "000000000")
+		bindBlob(5, storedPassword.hash)
+		bindBlob(6, storedPassword.salt)
+		bindString(7, UserRole.ADMIN)
+		executeInsert()
 	}
 }

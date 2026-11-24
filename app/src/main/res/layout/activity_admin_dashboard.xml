@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:id="@+id/admin_dashboard_root"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:background="@color/surface_soft"
+	android:orientation="vertical">
+
+	<com.google.android.material.appbar.MaterialToolbar
+		android:id="@+id/admin_dashboard_toolbar"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:background="@color/white"
+		android:minHeight="56dp"
+		app:title="@string/admin_dashboard_title"
+		app:titleTextColor="@color/black" />
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="horizontal"
+		android:padding="16dp">
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/admin_filter_all"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:text="@string/filter_all"
+			android:textAllCaps="false" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/admin_filter_lost"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="8dp"
+			android:layout_weight="1"
+			android:text="@string/lost"
+			android:textAllCaps="false" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/admin_filter_found"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="8dp"
+			android:layout_weight="1"
+			android:text="@string/found"
+			android:textAllCaps="false" />
+	</LinearLayout>
+
+	<androidx.recyclerview.widget.RecyclerView
+		android:id="@+id/admin_items_list"
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1"
+		android:clipToPadding="false"
+		android:padding="12dp" />
+
+	<TextView
+		android:id="@+id/admin_items_empty"
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1"
+		android:gravity="center"
+		android:text="@string/admin_no_posts"
+		android:visibility="gone" />
+
+	<com.google.android.material.button.MaterialButton
+		android:id="@+id/admin_logout"
+		style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_margin="16dp"
+		android:text="@string/profile_logout"
+		android:textAllCaps="false"
+		android:textColor="@color/brand_red_accessible"
+		app:strokeColor="@color/brand_red_accessible" />
+</LinearLayout>

@@ -138,4 +138,9 @@ Bring it home.</string >
 	<string name="my_posts_title">My posts</string>
 	<string name="my_posts_empty">You have not posted any items.</string>
 	<string name="filter_all">All</string>
+	<string name="admin_dashboard_title">Admin Dashboard</string>
+	<string name="admin_item_details_title">Post details</string>
+	<string name="admin_no_posts">No posts available.</string>
+	<string name="admin_access_denied">Administrator access required.</string>
+	<string name="admin_delete_failed">Unable to delete this post.</string>
 </resources >

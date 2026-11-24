@@ -70,6 +70,9 @@ interface LostItemDao {
 
 	@Query("DELETE FROM lost_items WHERE id = :id AND posted_by_user_id = :ownerId")
 	suspend fun deleteOwned(id: Long, ownerId: Long): Int
+
+	@Query("DELETE FROM lost_items WHERE id = :id")
+	suspend fun deleteOwnedById(id: Long): Int
 }
 
 @Dao
@@ -107,4 +110,7 @@ interface FoundItemDao {
 
 	@Query("DELETE FROM found_items WHERE id = :id AND posted_by_user_id = :ownerId")
 	suspend fun deleteOwned(id: Long, ownerId: Long): Int
+
+	@Query("DELETE FROM found_items WHERE id = :id")
+	suspend fun deleteOwnedById(id: Long): Int
 }

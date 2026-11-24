@@ -68,4 +68,17 @@ class LostAndFoundRepository(database: AppDatabase) {
 	) > 0
 	suspend fun deleteFoundItemOwned(id: Long, ownerId: Long): Boolean =
 		foundItems.deleteOwned(id, ownerId) > 0
+
+	suspend fun isAdmin(userId: Long): Boolean =
+		users.getById(userId)?.role == UserRole.ADMIN
+
+	suspend fun deleteLostItemAsAdmin(id: Long, adminId: Long): Boolean {
+		if (!isAdmin(adminId)) return false
+		return lostItems.deleteOwnedById(id) > 0
+	}
+
+	suspend fun deleteFoundItemAsAdmin(id: Long, adminId: Long): Boolean {
+		if (!isAdmin(adminId)) return false
+		return foundItems.deleteOwnedById(id) > 0
+	}
 }
