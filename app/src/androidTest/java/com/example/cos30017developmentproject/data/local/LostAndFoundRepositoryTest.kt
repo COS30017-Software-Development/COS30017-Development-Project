@@ -1,0 +1,182 @@
+package com.example.cos30017developmentproject.data.local
+
+import android.content.Context
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class LostAndFoundRepositoryTest {
+	private lateinit var database: AppDatabase
+	private lateinit var repository: LostAndFoundRepository
+
+	@Before
+	fun setUp() {
+		val context = ApplicationProvider.getApplicationContext<Context>()
+		database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+			.allowMainThreadQueries()
+			.build()
+		repository = LostAndFoundRepository(database)
+	}
+
+	@After
+	fun tearDown() {
+		database.close()
+	}
+
+	@Test
+	fun roomPersistsOwnedLostAndFoundItemCrud() = runBlocking {
+		val userId = database.userDao().insert(
+			UserEntity(username = "Student", email = "student@test.local", studentId = "123456789")
+		)
+		val lostId = repository.addLostItem(
+			LostItemEntity(
+				title = "Keys",
+				description = "Keys near library",
+				location = "Library",
+				category = "Keys",
+				imageName = "sample_keys",
+				postedByUserId = userId
+			)
+		)
+		assertNotNull(repository.getLostItem(lostId))
+		assertTrue(repository.updateLostItemOwned(lostId, userId, "Updated keys", "Updated", "Library", "Keys", "sample_keys"))
+		assertFalse(repository.updateLostItemOwned(lostId, userId + 1, "Wrong", "Wrong", "Wrong", "Keys", "sample_keys"))
+		assertTrue(repository.deleteLostItemOwned(lostId, userId))
+		assertEquals(null, repository.getLostItem(lostId))
+
+		val foundId = repository.addFoundItem(
+			FoundItemEntity(
+				title = "Bottle",
+				description = "Bottle near classroom",
+				location = "Classroom",
+				category = "Bottle",
+				imageName = "sample_bottle",
+				postedByUserId = userId
+			)
+		)
+		assertTrue(repository.updateFoundItemOwned(foundId, userId, "Updated bottle", "Updated", "Library", "Bottle", "sample_bottle"))
+		assertFalse(repository.deleteFoundItemOwned(foundId, userId + 1))
+		assertTrue(repository.deleteFoundItemOwned(foundId, userId))
+		assertEquals(null, repository.getFoundItem(foundId))
+	}
+
+	@Test
+	fun claimRejectsOwnerClosedAndDuplicateSubmissions() = runBlocking {
+		val ownerId = database.userDao().insert(
+			UserEntity(username = "Owner", email = "owner@test.local", studentId = "100000001")
+		)
+		val claimantId = database.userDao().insert(
+			UserEntity(username = "Claimant", email = "claimant@test.local", studentId = "100000002")
+	 )
+		val foundId = repository.addFoundItem(
+			FoundItemEntity(
+				title = "Bag",
+				description = "Bag in library",
+				location = "Library",
+				category = "Bag",
+				imageName = "sample_backpack",
+				postedByUserId = ownerId
+			)
+		)
+
+		assertEquals(
+			ClaimSubmissionResult.OWNER_CANNOT_CLAIM,
+			repository.submitClaim(foundId, ownerId, "This is a valid claim description")
+		)
+		assertEquals(
+			ClaimSubmissionResult.DESCRIPTION_TOO_SHORT,
+			repository.submitClaim(foundId, claimantId, "short")
+		)
+		assertEquals(
+			ClaimSubmissionResult.SUCCESS,
+			repository.submitClaim(foundId, claimantId, "This bag belongs to me")
+		)
+		assertEquals(
+			ClaimSubmissionResult.ALREADY_CLAIMED,
+			repository.submitClaim(foundId, claimantId, "This is another claim")
+		)
+
+		database.foundItemDao().updateStatus(foundId, ItemStatus.CLOSED)
+		assertEquals(
+			ClaimSubmissionResult.ITEM_CLOSED,
+			repository.submitClaim(foundId, claimantId + 1, "This description is valid")
+		)
+	}
+
+	@Test
+	fun approveClaimClosesFoundItemAndRejectsOtherPendingClaims() = runBlocking {
+		val ownerId = database.userDao().insert(
+			UserEntity(username = "Owner", email = "owner2@test.local", studentId = "200000001")
+		)
+		val adminId = database.userDao().insert(
+			UserEntity(username = "Admin", email = "admin@test.local", studentId = "200000002", role = UserRole.ADMIN)
+		)
+		val claimant1 = database.userDao().insert(
+			UserEntity(username = "One", email = "one@test.local", studentId = "200000003")
+		)
+		val claimant2 = database.userDao().insert(
+			UserEntity(username = "Two", email = "two@test.local", studentId = "200000004")
+		)
+		val foundId = repository.addFoundItem(
+			FoundItemEntity(
+				title = "Watch",
+				description = "Watch found near office",
+				location = "Office",
+				category = "Watch",
+				imageName = "sample_backpack",
+				postedByUserId = ownerId
+			)
+		)
+		assertEquals(ClaimSubmissionResult.SUCCESS, repository.submitClaim(foundId, claimant1, "Watch belongs to claimant one"))
+		assertEquals(ClaimSubmissionResult.SUCCESS, repository.submitClaim(foundId, claimant2, "Watch belongs to claimant two"))
+		val approvedId = database.claimDao().getByClaimantAndItem(claimant1, foundId)?.id ?: error("Missing claim")
+
+		assertEquals(ClaimReviewResult.SUCCESS, repository.approveClaim(approvedId, adminId))
+		assertEquals(ItemStatus.CLOSED, repository.getFoundItem(foundId)?.status)
+		assertEquals(ClaimStatus.APPROVED, database.claimDao().getById(approvedId)?.status)
+		val rejectedId = database.claimDao().getByClaimantAndItem(claimant2, foundId)?.id ?: error("Missing claim")
+		assertEquals(ClaimStatus.REJECTED, database.claimDao().getById(rejectedId)?.status)
+		assertEquals(ClaimReviewResult.ALREADY_PROCESSED, repository.approveClaim(approvedId, adminId))
+	}
+
+	@Test
+	fun rejectAndAdminDeleteEnforcePermissions() = runBlocking {
+		val studentId = database.userDao().insert(
+			UserEntity(username = "Student", email = "student3@test.local", studentId = "300000001")
+		)
+		val adminId = database.userDao().insert(
+			UserEntity(username = "Admin", email = "admin3@test.local", studentId = "300000002", role = UserRole.ADMIN)
+		)
+		val foundId = repository.addFoundItem(
+			FoundItemEntity(
+				title = "Card",
+				description = "Card found in lecture hall",
+				location = "Lecture hall",
+				category = "Card",
+				imageName = "sample_backpack",
+				postedByUserId = studentId
+			)
+		)
+		val claimantId = database.userDao().insert(
+			UserEntity(username = "Claimant", email = "claimant3@test.local", studentId = "300000003")
+		)
+		assertEquals(ClaimSubmissionResult.SUCCESS, repository.submitClaim(foundId, claimantId, "This card is mine with details"))
+		val claim = database.claimDao().getByClaimantAndItem(claimantId, foundId) ?: error("Missing claim")
+
+		assertEquals(ClaimReviewResult.ACCESS_DENIED, repository.rejectClaim(claim.id, studentId))
+		assertEquals(ClaimReviewResult.SUCCESS, repository.rejectClaim(claim.id, adminId))
+		assertEquals(ClaimStatus.REJECTED, database.claimDao().getById(claim.id)?.status)
+		assertFalse(repository.deleteFoundItemAsAdmin(foundId, studentId))
+		assertTrue(repository.deleteFoundItemAsAdmin(foundId, adminId))
+	}
+}
