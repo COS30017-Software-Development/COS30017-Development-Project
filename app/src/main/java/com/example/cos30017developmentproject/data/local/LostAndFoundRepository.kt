@@ -6,6 +6,7 @@ class LostAndFoundRepository(database: AppDatabase) {
 	private val users = database.userDao()
 	private val lostItems = database.lostItemDao()
 	private val foundItems = database.foundItemDao()
+	private val claims = database.claimDao()
 
 	fun observeUsers(): Flow<List<UserEntity>> = users.observeAll()
 	suspend fun getUser(id: Long): UserEntity? = users.getById(id)
@@ -69,6 +70,39 @@ class LostAndFoundRepository(database: AppDatabase) {
 	suspend fun deleteFoundItemOwned(id: Long, ownerId: Long): Boolean =
 		foundItems.deleteOwned(id, ownerId) > 0
 
+	fun observeClaims(userId: Long): Flow<List<ClaimEntity>> = claims.observeByClaimant(userId)
+	suspend fun hasClaim(userId: Long, foundItemId: Long): Boolean =
+		claims.getByClaimantAndItem(userId, foundItemId) != null
+
+	suspend fun submitClaim(foundItemId: Long, claimantUserId: Long, description: String): ClaimSubmissionResult {
+		val item = foundItems.getById(foundItemId)
+			?: return ClaimSubmissionResult.ITEM_NOT_FOUND
+		if (item.status != ItemStatus.ACTIVE) return ClaimSubmissionResult.ITEM_CLOSED
+		if (item.postedByUserId == claimantUserId) return ClaimSubmissionResult.OWNER_CANNOT_CLAIM
+		if (claims.getByClaimantAndItem(claimantUserId, foundItemId) != null) {
+			return ClaimSubmissionResult.ALREADY_CLAIMED
+		}
+		val validatedDescription = description.trim()
+		when (ClaimValidation.validateDescription(description)) {
+			ClaimDescriptionValidation.TOO_SHORT -> return ClaimSubmissionResult.DESCRIPTION_TOO_SHORT
+			ClaimDescriptionValidation.TOO_LONG -> return ClaimSubmissionResult.DESCRIPTION_TOO_LONG
+			ClaimDescriptionValidation.VALID -> Unit
+		}
+		return try {
+			val id = claims.insert(
+				ClaimEntity(
+					foundItemId = foundItemId,
+					claimantUserId = claimantUserId,
+					description = validatedDescription,
+					status = ClaimStatus.PENDING
+				)
+			)
+			if (id > 0) ClaimSubmissionResult.SUCCESS else ClaimSubmissionResult.FAILED
+		} catch (_: Exception) {
+			ClaimSubmissionResult.ALREADY_CLAIMED
+		}
+	}
+
 	suspend fun isAdmin(userId: Long): Boolean =
 		users.getById(userId)?.role == UserRole.ADMIN
 
@@ -81,4 +115,15 @@ class LostAndFoundRepository(database: AppDatabase) {
 		if (!isAdmin(adminId)) return false
 		return foundItems.deleteOwnedById(id) > 0
 	}
+}
+
+enum class ClaimSubmissionResult {
+	SUCCESS,
+	ITEM_NOT_FOUND,
+	ITEM_CLOSED,
+	OWNER_CANNOT_CLAIM,
+	ALREADY_CLAIMED,
+	DESCRIPTION_TOO_SHORT,
+	DESCRIPTION_TOO_LONG,
+	FAILED
 }

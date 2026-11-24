@@ -16,7 +16,11 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.data.local.AppDatabase
+import com.example.cos30017developmentproject.data.local.ClaimSubmissionResult
+import com.example.cos30017developmentproject.data.local.ItemStatus
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -61,7 +65,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 						ItemDetails(it.id, it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId)
 					}
 					TYPE_FOUND -> repository.getFoundItem(id)?.let {
-						ItemDetails(it.id, it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId)
+						ItemDetails(it.id, it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId, it.status)
 					}
 					else -> null
 				} ?: run {
@@ -90,7 +94,9 @@ class ItemDetailsActivity : AppCompatActivity() {
 			R.string.item_type_format,
 			getString(if (type == TYPE_FOUND) R.string.found else R.string.lost)
 		)
-		findViewById<TextView>(R.id.item_details_status).setText(R.string.item_active)
+		findViewById<TextView>(R.id.item_details_status).setText(
+			if (item.status == ItemStatus.CLOSED) R.string.item_closed else R.string.item_active
+		)
 		findViewById<TextView>(R.id.item_details_category).text = item.category
 		findViewById<TextView>(R.id.item_details_location).text = item.location
 		findViewById<TextView>(R.id.item_details_description).text = item.description
@@ -100,6 +106,90 @@ class ItemDetailsActivity : AppCompatActivity() {
 			SessionManager(this).userId == item.postedByUserId
 		findViewById<View>(R.id.edit_item).setOnClickListener { openEdit(item.id, type) }
 		findViewById<View>(R.id.delete_item).setOnClickListener { confirmDelete(item.id, type) }
+		findViewById<View>(R.id.claim_item).setOnClickListener { openClaimDialog(item) }
+		updateClaimButton(item, type)
+	}
+
+	private fun updateClaimButton(item: ItemDetails, type: String) {
+		val claimButton = findViewById<View>(R.id.claim_item)
+		val session = SessionManager(this)
+		val userId = session.userId
+		if (type != TYPE_FOUND || item.status == ItemStatus.CLOSED || item.postedByUserId == userId) {
+			claimButton.isVisible = false
+			return
+		}
+		if (userId == null) {
+			claimButton.isVisible = true
+			claimButton.setOnClickListener {
+				startActivity(Intent(this, AuthActivity::class.java))
+			}
+			return
+		}
+		lifecycleScope.launch {
+			val alreadyClaimed = repository.hasClaim(userId, item.id)
+			claimButton.isVisible = !alreadyClaimed
+			claimButton.isEnabled = !alreadyClaimed
+		}
+	}
+
+	private fun openClaimDialog(item: ItemDetails) {
+		val userId = SessionManager(this).userId
+		if (userId == null) {
+			startActivity(Intent(this, AuthActivity::class.java))
+			return
+		}
+		val dialogView = layoutInflater.inflate(R.layout.dialog_submit_claim, null)
+		val inputLayout = dialogView.findViewById<TextInputLayout>(R.id.claim_description_layout)
+		val input = dialogView.findViewById<TextInputEditText>(R.id.claim_description)
+		val dialog = MaterialAlertDialogBuilder(this)
+			.setTitle(R.string.claim_item_title)
+			.setView(dialogView)
+			.setNegativeButton(R.string.cancel, null)
+			.setPositiveButton(R.string.submit_claim, null)
+			.create()
+		dialog.setOnShowListener {
+			dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+				val description = input.text?.toString().orEmpty().trim()
+				when {
+					description.length < 10 -> inputLayout.error = getString(R.string.claim_description_too_short)
+					description.length > 500 -> inputLayout.error = getString(R.string.claim_description_too_long)
+					else -> {
+						inputLayout.error = null
+						submitClaim(dialog, item.id, userId, description)
+					}
+				}
+			}
+		}
+		dialog.show()
+	}
+
+	private fun submitClaim(dialog: androidx.appcompat.app.AlertDialog, itemId: Long, userId: Long, description: String) {
+		lifecycleScope.launch {
+			try {
+				val result = repository.submitClaim(itemId, userId, description)
+				val message = when (result) {
+					ClaimSubmissionResult.SUCCESS -> R.string.claim_submitted
+					ClaimSubmissionResult.ITEM_NOT_FOUND -> R.string.item_not_found
+					ClaimSubmissionResult.ITEM_CLOSED -> R.string.claim_item_closed
+					ClaimSubmissionResult.OWNER_CANNOT_CLAIM -> R.string.claim_owner_not_allowed
+					ClaimSubmissionResult.ALREADY_CLAIMED -> R.string.claim_already_submitted
+					ClaimSubmissionResult.DESCRIPTION_TOO_SHORT -> R.string.claim_description_too_short
+					ClaimSubmissionResult.DESCRIPTION_TOO_LONG -> R.string.claim_description_too_long
+					ClaimSubmissionResult.FAILED -> R.string.claim_submit_failed
+				}
+				Toast.makeText(this@ItemDetailsActivity, message, Toast.LENGTH_SHORT).show()
+				if (result == ClaimSubmissionResult.SUCCESS) {
+					dialog.dismiss()
+					findViewById<View>(R.id.claim_item).isEnabled = false
+					findViewById<View>(R.id.claim_item).visibility = View.GONE
+				}
+			} catch (e: CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				Log.e(TAG, "Unable to submit claim", e)
+				Toast.makeText(this@ItemDetailsActivity, R.string.claim_submit_failed, Toast.LENGTH_SHORT).show()
+			}
+		}
 	}
 
 	private fun openEdit(id: Long, type: String) {
@@ -188,7 +278,8 @@ class ItemDetailsActivity : AppCompatActivity() {
 		val location: String,
 		val category: String,
 		val imageName: String,
-		val postedByUserId: Long
+		val postedByUserId: Long,
+		val status: String = ItemStatus.ACTIVE
 	)
 
 	companion object {

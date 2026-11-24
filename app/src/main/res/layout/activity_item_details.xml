@@ -169,6 +169,19 @@
 		</LinearLayout>
 
 		<com.google.android.material.button.MaterialButton
+			android:id="@+id/claim_item"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_marginTop="8dp"
+			android:minHeight="52dp"
+			android:text="@string/submit_claim"
+			android:textAllCaps="false"
+			android:textColor="@color/white"
+			android:visibility="gone"
+			app:backgroundTint="@color/brand_red_accessible"
+			app:cornerRadius="12dp" />
+
+		<com.google.android.material.button.MaterialButton
 			android:id="@+id/back_to_items"
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"

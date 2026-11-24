@@ -9,14 +9,15 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.cos30017developmentproject.auth.PasswordHasher
 
 @Database(
-	entities = [UserEntity::class, LostItemEntity::class, FoundItemEntity::class],
-	version = 5,
+	entities = [UserEntity::class, LostItemEntity::class, FoundItemEntity::class, ClaimEntity::class],
+	version = 6,
 	exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 	abstract fun userDao(): UserDao
 	abstract fun lostItemDao(): LostItemDao
 	abstract fun foundItemDao(): FoundItemDao
+	abstract fun claimDao(): ClaimDao
 
 	companion object {
 		private const val DATABASE_NAME = "campus_lost_and_found.db"
@@ -43,6 +44,26 @@ abstract class AppDatabase : RoomDatabase() {
 				insertAdminUser(db)
 			}
 		}
+		val MIGRATION_5_6 = object : Migration(5, 6) {
+			override fun migrate(db: SupportSQLiteDatabase) {
+				db.execSQL("ALTER TABLE found_items ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE'")
+				db.execSQL("""
+					CREATE TABLE IF NOT EXISTS claims (
+						id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+						found_item_id INTEGER NOT NULL,
+						claimant_user_id INTEGER NOT NULL,
+						description TEXT NOT NULL,
+						status TEXT NOT NULL,
+						submitted_at INTEGER NOT NULL,
+						FOREIGN KEY(found_item_id) REFERENCES found_items(id) ON DELETE CASCADE,
+						FOREIGN KEY(claimant_user_id) REFERENCES users(id) ON DELETE CASCADE
+					)
+				""")
+				db.execSQL("CREATE INDEX IF NOT EXISTS index_claims_found_item_id ON claims(found_item_id)")
+				db.execSQL("CREATE INDEX IF NOT EXISTS index_claims_claimant_user_id ON claims(claimant_user_id)")
+				db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_claims_claimant_user_id_found_item_id ON claims(claimant_user_id, found_item_id)")
+			}
+		}
 
 		@Volatile
 		private var instance: AppDatabase? = null
@@ -52,7 +73,7 @@ abstract class AppDatabase : RoomDatabase() {
 				context.applicationContext,
 				AppDatabase::class.java,
 				DATABASE_NAME
-			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).addCallback(SeedDataCallback()).build().also { instance = it }
+			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).addCallback(SeedDataCallback()).build().also { instance = it }
 		}
 	}
 }

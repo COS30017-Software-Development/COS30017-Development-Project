@@ -55,10 +55,53 @@ data class FoundItemEntity(
 	val location: String,
 	val category: String,
 	@ColumnInfo(name = "image_name") val imageName: String,
-	@ColumnInfo(name = "posted_by_user_id") val postedByUserId: Long
+	@ColumnInfo(name = "posted_by_user_id") val postedByUserId: Long,
+	@ColumnInfo(name = "status") val status: String = ItemStatus.ACTIVE
+)
+
+@Entity(
+	tableName = "claims",
+	foreignKeys = [
+		ForeignKey(
+			entity = FoundItemEntity::class,
+			parentColumns = ["id"],
+			childColumns = ["found_item_id"],
+			onDelete = ForeignKey.CASCADE
+		),
+		ForeignKey(
+			entity = UserEntity::class,
+			parentColumns = ["id"],
+			childColumns = ["claimant_user_id"],
+			onDelete = ForeignKey.CASCADE
+		)
+	],
+	indices = [
+		Index(value = ["found_item_id"]),
+		Index(value = ["claimant_user_id"]),
+		Index(value = ["claimant_user_id", "found_item_id"], unique = true)
+	]
+)
+data class ClaimEntity(
+	@PrimaryKey(autoGenerate = true) val id: Long = 0,
+	@ColumnInfo(name = "found_item_id") val foundItemId: Long,
+	@ColumnInfo(name = "claimant_user_id") val claimantUserId: Long,
+	val description: String,
+	val status: String = ClaimStatus.PENDING,
+	@ColumnInfo(name = "submitted_at") val submittedAt: Long = System.currentTimeMillis()
 )
 
 object UserRole {
 	const val STUDENT = "STUDENT"
 	const val ADMIN = "ADMIN"
+}
+
+object ItemStatus {
+	const val ACTIVE = "ACTIVE"
+	const val CLOSED = "CLOSED"
+}
+
+object ClaimStatus {
+	const val PENDING = "PENDING"
+	const val APPROVED = "APPROVED"
+	const val REJECTED = "REJECTED"
 }

@@ -114,3 +114,15 @@ interface FoundItemDao {
 	@Query("DELETE FROM found_items WHERE id = :id")
 	suspend fun deleteOwnedById(id: Long): Int
 }
+
+@Dao
+interface ClaimDao {
+	@Query("SELECT * FROM claims WHERE claimant_user_id = :userId ORDER BY submitted_at DESC")
+	fun observeByClaimant(userId: Long): Flow<List<ClaimEntity>>
+
+	@Query("SELECT * FROM claims WHERE claimant_user_id = :userId AND found_item_id = :foundItemId LIMIT 1")
+	suspend fun getByClaimantAndItem(userId: Long, foundItemId: Long): ClaimEntity?
+
+	@Insert(onConflict = OnConflictStrategy.ABORT)
+	suspend fun insert(claim: ClaimEntity): Long
+}
