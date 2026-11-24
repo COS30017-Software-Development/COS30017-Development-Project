@@ -29,6 +29,9 @@
 			android:exported = "false"
 			android:windowSoftInputMode = "adjustResize" />
 		<activity
+			android:name = ".AdminClaimReviewActivity"
+			android:exported = "false" />
+		<activity
 			android:name = ".AddItemActivity"
 			android:exported = "false"
 			android:windowSoftInputMode = "adjustResize" />

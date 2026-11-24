@@ -161,4 +161,18 @@ Bring it home.</string >
 	<string name="admin_no_posts">No posts available.</string>
 	<string name="admin_access_denied">Administrator access required.</string>
 	<string name="admin_delete_failed">Unable to delete this post.</string>
+	<string name="admin_claim_requests">Claim Requests</string>
+	<string name="admin_claim_review_title">Claim review</string>
+	<string name="admin_claim_empty">No claim requests.</string>
+	<string name="admin_claim_approve">Approve</string>
+	<string name="admin_claim_reject">Reject</string>
+	<string name="admin_claim_applicant">Applicant</string>
+	<string name="admin_claim_item">Item</string>
+	<string name="admin_claim_description">Claim explanation</string>
+	<string name="admin_claim_submitted">Submitted</string>
+	<string name="claim_approved_success">Claim approved. The item is now closed.</string>
+	<string name="claim_rejected_success">Claim rejected.</string>
+	<string name="claim_review_already_processed">This claim was already processed.</string>
+	<string name="claim_review_failed">Unable to update this claim.</string>
+	<string name="claim_review_item_closed">This item is no longer available.</string>
 </resources >

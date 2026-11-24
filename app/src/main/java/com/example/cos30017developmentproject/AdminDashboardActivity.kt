@@ -53,6 +53,9 @@ class AdminDashboardActivity : AppCompatActivity() {
 			startActivity(Intent(this, AuthActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
 			finish()
 		}
+		findViewById<View>(R.id.admin_claim_requests).setOnClickListener {
+			startActivity(Intent(this, AdminClaimReviewActivity::class.java))
+		}
 		adapter = ItemCardAdapter(onItemClick = ::openDetails)
 		adapter.setListMode(true)
 		findViewById<RecyclerView>(R.id.admin_items_list).apply {

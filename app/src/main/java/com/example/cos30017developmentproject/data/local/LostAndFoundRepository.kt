@@ -1,8 +1,10 @@
 package com.example.cos30017developmentproject.data.local
 
 import kotlinx.coroutines.flow.Flow
+import androidx.room.withTransaction
 
 class LostAndFoundRepository(database: AppDatabase) {
+	private val database = database
 	private val users = database.userDao()
 	private val lostItems = database.lostItemDao()
 	private val foundItems = database.foundItemDao()
@@ -71,6 +73,7 @@ class LostAndFoundRepository(database: AppDatabase) {
 		foundItems.deleteOwned(id, ownerId) > 0
 
 	fun observeClaims(userId: Long): Flow<List<ClaimEntity>> = claims.observeByClaimant(userId)
+	fun observeAllClaims(): Flow<List<ClaimEntity>> = claims.observeAll()
 	suspend fun hasClaim(userId: Long, foundItemId: Long): Boolean =
 		claims.getByClaimantAndItem(userId, foundItemId) != null
 
@@ -106,6 +109,48 @@ class LostAndFoundRepository(database: AppDatabase) {
 	suspend fun isAdmin(userId: Long): Boolean =
 		users.getById(userId)?.role == UserRole.ADMIN
 
+	suspend fun approveClaim(claimId: Long, adminId: Long): ClaimReviewResult {
+		if (!isAdmin(adminId)) return ClaimReviewResult.ACCESS_DENIED
+		return try {
+			database.withTransaction {
+				val claim = claims.getById(claimId)
+					?: return@withTransaction ClaimReviewResult.NOT_FOUND
+				if (!ClaimReviewPolicy.canProcess(claim.status)) return@withTransaction ClaimReviewResult.ALREADY_PROCESSED
+				val item = foundItems.getById(claim.foundItemId)
+					?: return@withTransaction ClaimReviewResult.ITEM_NOT_FOUND
+				if (item.status != ItemStatus.ACTIVE) return@withTransaction ClaimReviewResult.ITEM_CLOSED
+				if (foundItems.updateStatusIfActive(item.id, ClaimReviewPolicy.approvedItemStatus()) != 1) {
+					return@withTransaction ClaimReviewResult.ITEM_CLOSED
+				}
+				if (claims.updateStatusIfPending(claimId, ClaimStatus.APPROVED) != 1) {
+					throw IllegalStateException("Claim processing changed concurrently")
+				}
+				claims.rejectOtherPending(item.id, claimId)
+				ClaimReviewResult.SUCCESS
+			}
+		} catch (_: Exception) {
+			ClaimReviewResult.FAILED
+		}
+	}
+
+	suspend fun rejectClaim(claimId: Long, adminId: Long): ClaimReviewResult {
+		if (!isAdmin(adminId)) return ClaimReviewResult.ACCESS_DENIED
+		return try {
+			database.withTransaction {
+				val claim = claims.getById(claimId)
+					?: return@withTransaction ClaimReviewResult.NOT_FOUND
+				if (!ClaimReviewPolicy.canProcess(claim.status)) return@withTransaction ClaimReviewResult.ALREADY_PROCESSED
+				if (claims.updateStatusIfPending(claimId, ClaimStatus.REJECTED) == 1) {
+					ClaimReviewResult.SUCCESS
+				} else {
+					ClaimReviewResult.ALREADY_PROCESSED
+				}
+			}
+		} catch (_: Exception) {
+			ClaimReviewResult.FAILED
+		}
+	}
+
 	suspend fun deleteLostItemAsAdmin(id: Long, adminId: Long): Boolean {
 		if (!isAdmin(adminId)) return false
 		return lostItems.deleteOwnedById(id) > 0
@@ -125,5 +170,15 @@ enum class ClaimSubmissionResult {
 	ALREADY_CLAIMED,
 	DESCRIPTION_TOO_SHORT,
 	DESCRIPTION_TOO_LONG,
+	FAILED
+}
+
+enum class ClaimReviewResult {
+	SUCCESS,
+	ACCESS_DENIED,
+	NOT_FOUND,
+	ALREADY_PROCESSED,
+	ITEM_NOT_FOUND,
+	ITEM_CLOSED,
 	FAILED
 }

@@ -67,6 +67,17 @@
 		android:visibility="gone" />
 
 	<com.google.android.material.button.MaterialButton
+		android:id="@+id/admin_claim_requests"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginHorizontal="16dp"
+		android:layout_marginBottom="8dp"
+		android:text="@string/admin_claim_requests"
+		android:textAllCaps="false"
+		app:backgroundTint="@color/brand_red_accessible"
+		app:cornerRadius="12dp" />
+
+	<com.google.android.material.button.MaterialButton
 		android:id="@+id/admin_logout"
 		style="@style/Widget.MaterialComponents.Button.OutlinedButton"
 		android:layout_width="match_parent"

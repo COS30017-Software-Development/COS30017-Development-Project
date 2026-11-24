@@ -113,16 +113,34 @@ interface FoundItemDao {
 
 	@Query("DELETE FROM found_items WHERE id = :id")
 	suspend fun deleteOwnedById(id: Long): Int
+
+	@Query("UPDATE found_items SET status = :status WHERE id = :id")
+	suspend fun updateStatus(id: Long, status: String): Int
+
+	@Query("UPDATE found_items SET status = :status WHERE id = :id AND status = 'ACTIVE'")
+	suspend fun updateStatusIfActive(id: Long, status: String): Int
 }
 
 @Dao
 interface ClaimDao {
+	@Query("SELECT * FROM claims ORDER BY submitted_at DESC")
+	fun observeAll(): Flow<List<ClaimEntity>>
+
 	@Query("SELECT * FROM claims WHERE claimant_user_id = :userId ORDER BY submitted_at DESC")
 	fun observeByClaimant(userId: Long): Flow<List<ClaimEntity>>
+
+	@Query("SELECT * FROM claims WHERE id = :id")
+	suspend fun getById(id: Long): ClaimEntity?
 
 	@Query("SELECT * FROM claims WHERE claimant_user_id = :userId AND found_item_id = :foundItemId LIMIT 1")
 	suspend fun getByClaimantAndItem(userId: Long, foundItemId: Long): ClaimEntity?
 
 	@Insert(onConflict = OnConflictStrategy.ABORT)
 	suspend fun insert(claim: ClaimEntity): Long
+
+	@Query("UPDATE claims SET status = :status WHERE id = :id AND status = 'PENDING'")
+	suspend fun updateStatusIfPending(id: Long, status: String): Int
+
+	@Query("UPDATE claims SET status = 'REJECTED' WHERE found_item_id = :foundItemId AND id != :approvedClaimId AND status = 'PENDING'")
+	suspend fun rejectOtherPending(foundItemId: Long, approvedClaimId: Long): Int
 }
