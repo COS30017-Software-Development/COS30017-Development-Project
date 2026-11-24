@@ -87,7 +87,7 @@ private fun insertSeedUser(
 ) {
 	val storedPassword = PasswordHasher().hash(password.toCharArray())
 	db.compileStatement(
-		"INSERT INTO users (id, username, email, student_id, password_hash, password_salt) VALUES (?, ?, ?, ?, ?, ?)"
+		"INSERT INTO users (id, username, email, student_id, password_hash, password_salt, role) VALUES (?, ?, ?, ?, ?, ?, ?)"
 	).apply {
 		bindLong(1, id)
 		bindString(2, username)
@@ -95,6 +95,7 @@ private fun insertSeedUser(
 		bindString(4, studentId)
 		bindBlob(5, storedPassword.hash)
 		bindBlob(6, storedPassword.salt)
+		bindString(7, UserRole.STUDENT)
 		executeInsert()
 	}
 }
