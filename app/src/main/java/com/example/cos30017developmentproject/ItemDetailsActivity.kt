@@ -2,6 +2,7 @@ package com.example.cos30017developmentproject
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
@@ -17,6 +18,7 @@ import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class ItemDetailsActivity : AppCompatActivity() {
@@ -53,19 +55,27 @@ class ItemDetailsActivity : AppCompatActivity() {
 
 	private fun loadItem(id: Long, type: String) {
 		lifecycleScope.launch {
-			val item = when (type) {
-				TYPE_LOST -> repository.getLostItem(id)?.let {
-					ItemDetails(it.id, it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId)
+			try {
+				val item = when (type) {
+					TYPE_LOST -> repository.getLostItem(id)?.let {
+						ItemDetails(it.id, it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId)
+					}
+					TYPE_FOUND -> repository.getFoundItem(id)?.let {
+						ItemDetails(it.id, it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId)
+					}
+					else -> null
+				} ?: run {
+					showItemNotFound()
+					return@launch
 				}
-				TYPE_FOUND -> repository.getFoundItem(id)?.let {
-					ItemDetails(it.id, it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId)
-				}
-				else -> null
-			} ?: run {
-				showItemNotFound()
-				return@launch
+				bindItem(item, type, repository.getUser(item.postedByUserId)?.username)
+			} catch (e: CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				Log.e(TAG, "Unable to load item", e)
+				Toast.makeText(this@ItemDetailsActivity, R.string.item_save_failed, Toast.LENGTH_SHORT).show()
+				finish()
 			}
-			bindItem(item, type, repository.getUser(item.postedByUserId)?.username)
 		}
 	}
 
@@ -106,32 +116,50 @@ class ItemDetailsActivity : AppCompatActivity() {
 	}
 
 	private fun confirmDelete(id: Long, type: String) {
-		MaterialAlertDialogBuilder(this)
-			.setTitle(R.string.delete_item_title)
-			.setMessage(R.string.delete_item_message)
-			.setNegativeButton(R.string.cancel, null)
-			.setPositiveButton(R.string.delete) { _, _ -> deleteItem(id, type) }
-			.show()
+		lifecycleScope.launch {
+			try {
+				if (!isCurrentUserOwner(id, type)) {
+					showPermissionDenied()
+					return@launch
+				}
+				MaterialAlertDialogBuilder(this@ItemDetailsActivity)
+					.setTitle(R.string.delete_item_title)
+					.setMessage(R.string.delete_item_message)
+					.setNegativeButton(R.string.cancel, null)
+					.setPositiveButton(R.string.delete) { _, _ -> deleteItem(id, type) }
+					.show()
+			} catch (e: CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				Log.e(TAG, "Unable to verify item ownership", e)
+				Toast.makeText(this@ItemDetailsActivity, R.string.item_save_failed, Toast.LENGTH_SHORT).show()
+			}
+		}
 	}
 
 	private fun deleteItem(id: Long, type: String) {
 		lifecycleScope.launch {
-			val userId = SessionManager(this@ItemDetailsActivity).userId
-			val deleted = when (type) {
-				TYPE_LOST -> repository.getLostItem(id)?.takeIf { it.postedByUserId == userId }?.let {
-					repository.deleteLostItem(it)
-					true
-				} ?: false
-				TYPE_FOUND -> repository.getFoundItem(id)?.takeIf { it.postedByUserId == userId }?.let {
-					repository.deleteFoundItem(it)
-					true
-				} ?: false
-				else -> false
+			try {
+				val userId = SessionManager(this@ItemDetailsActivity).userId
+					?: run {
+						showPermissionDenied()
+						return@launch
+					}
+				val deleted = when (type) {
+					TYPE_LOST -> repository.deleteLostItemOwned(id, userId)
+					TYPE_FOUND -> repository.deleteFoundItemOwned(id, userId)
+					else -> false
+				}
+				if (deleted) {
+					Toast.makeText(this@ItemDetailsActivity, R.string.item_deleted, Toast.LENGTH_SHORT).show()
+					finish()
+				} else showPermissionDenied()
+			} catch (e: CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				Log.e(TAG, "Unable to delete item", e)
+				Toast.makeText(this@ItemDetailsActivity, R.string.item_save_failed, Toast.LENGTH_SHORT).show()
 			}
-			if (deleted) {
-				Toast.makeText(this@ItemDetailsActivity, R.string.item_deleted, Toast.LENGTH_SHORT).show()
-				finish()
-			} else showPermissionDenied()
 		}
 	}
 
@@ -169,5 +197,6 @@ class ItemDetailsActivity : AppCompatActivity() {
 		const val TYPE_LOST = "Lost"
 		const val TYPE_FOUND = "Found"
 		private const val INVALID_ITEM_ID = -1L
+		private const val TAG = "ItemDetailsActivity"
 	}
 }

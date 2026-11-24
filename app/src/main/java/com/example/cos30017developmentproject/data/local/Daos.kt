@@ -49,8 +49,27 @@ interface LostItemDao {
 	@Update
 	suspend fun update(item: LostItemEntity)
 
+	@Query("""
+		UPDATE lost_items
+		SET title = :title, description = :description, location = :location,
+		    category = :category, image_name = :imageName
+		WHERE id = :id AND posted_by_user_id = :ownerId
+	""")
+	suspend fun updateOwned(
+		id: Long,
+		ownerId: Long,
+		title: String,
+		description: String,
+		location: String,
+		category: String,
+		imageName: String
+	): Int
+
 	@Delete
 	suspend fun delete(item: LostItemEntity)
+
+	@Query("DELETE FROM lost_items WHERE id = :id AND posted_by_user_id = :ownerId")
+	suspend fun deleteOwned(id: Long, ownerId: Long): Int
 }
 
 @Dao
@@ -67,6 +86,25 @@ interface FoundItemDao {
 	@Update
 	suspend fun update(item: FoundItemEntity)
 
+	@Query("""
+		UPDATE found_items
+		SET title = :title, description = :description, location = :location,
+		    category = :category, image_name = :imageName
+		WHERE id = :id AND posted_by_user_id = :ownerId
+	""")
+	suspend fun updateOwned(
+		id: Long,
+		ownerId: Long,
+		title: String,
+		description: String,
+		location: String,
+		category: String,
+		imageName: String
+	): Int
+
 	@Delete
 	suspend fun delete(item: FoundItemEntity)
+
+	@Query("DELETE FROM found_items WHERE id = :id AND posted_by_user_id = :ownerId")
+	suspend fun deleteOwned(id: Long, ownerId: Long): Int
 }

@@ -65,7 +65,15 @@ class MainActivity : AppCompatActivity() {
 			layoutManager = GridLayoutManager(
 				context, if (config.screenWidthDp >= 360 && config.fontScale <= 1.3f) 2 else 1
 			)
-			val itemAdapter = ItemCardAdapter()
+			val itemAdapter = ItemCardAdapter { item ->
+				startActivity(Intent(this@MainActivity, ItemDetailsActivity::class.java).apply {
+					putExtra(ItemDetailsActivity.EXTRA_ITEM_ID, item.id)
+					putExtra(
+						ItemDetailsActivity.EXTRA_ITEM_TYPE,
+						if (item.isFound) ItemDetailsActivity.TYPE_FOUND else ItemDetailsActivity.TYPE_LOST
+					)
+				})
+			}
 			adapter = itemAdapter
 			lifecycleScope.launch {
 				combine(repository.observeLostItems(), repository.observeFoundItems()) { lost, found ->

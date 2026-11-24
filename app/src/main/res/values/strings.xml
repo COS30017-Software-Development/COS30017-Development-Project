@@ -124,6 +124,12 @@ Bring it home.</string >
 	<string name="save_changes">Save changes</string>
 	<string name="item_updated">Item updated.</string>
 	<string name="item_fields_required">Complete all item fields.</string>
+	<string name="item_title_too_long">Item name is too long.</string>
+	<string name="item_category_too_long">Category is too long.</string>
+	<string name="item_location_too_long">Location is too long.</string>
+	<string name="item_description_too_long">Description is too long.</string>
+	<string name="item_image_name_invalid">Use a lowercase drawable name such as sample_backpack.</string>
+	<string name="item_save_failed">Unable to save this item. Please try again.</string>
 	<string name="add_item_title">Post an item</string>
 	<string name="post_item">Post item</string>
 	<string name="item_posted">Item posted.</string>

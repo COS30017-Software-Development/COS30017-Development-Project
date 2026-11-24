@@ -16,12 +16,56 @@ class LostAndFoundRepository(database: AppDatabase) {
 	fun observeLostItems(): Flow<List<LostItemEntity>> = lostItems.observeAll()
 	suspend fun getLostItem(id: Long): LostItemEntity? = lostItems.getById(id)
 	suspend fun addLostItem(item: LostItemEntity): Long = lostItems.insert(item)
-	suspend fun updateLostItem(item: LostItemEntity) = lostItems.update(item)
-	suspend fun deleteLostItem(item: LostItemEntity) = lostItems.delete(item)
+	suspend fun updateLostItem(item: LostItemEntity): Boolean = updateLostItemOwned(
+		item.id,
+		item.postedByUserId,
+		item.title,
+		item.description,
+		item.location,
+		item.category,
+		item.imageName
+	)
+	suspend fun deleteLostItem(item: LostItemEntity): Boolean =
+		deleteLostItemOwned(item.id, item.postedByUserId)
+	suspend fun updateLostItemOwned(
+		id: Long,
+		ownerId: Long,
+		title: String,
+		description: String,
+		location: String,
+		category: String,
+		imageName: String
+	): Boolean = lostItems.updateOwned(
+		id, ownerId, title, description, location, category, imageName
+	) > 0
+	suspend fun deleteLostItemOwned(id: Long, ownerId: Long): Boolean =
+		lostItems.deleteOwned(id, ownerId) > 0
 
 	fun observeFoundItems(): Flow<List<FoundItemEntity>> = foundItems.observeAll()
 	suspend fun getFoundItem(id: Long): FoundItemEntity? = foundItems.getById(id)
 	suspend fun addFoundItem(item: FoundItemEntity): Long = foundItems.insert(item)
-	suspend fun updateFoundItem(item: FoundItemEntity) = foundItems.update(item)
-	suspend fun deleteFoundItem(item: FoundItemEntity) = foundItems.delete(item)
+	suspend fun updateFoundItem(item: FoundItemEntity): Boolean = updateFoundItemOwned(
+		item.id,
+		item.postedByUserId,
+		item.title,
+		item.description,
+		item.location,
+		item.category,
+		item.imageName
+	)
+	suspend fun deleteFoundItem(item: FoundItemEntity): Boolean =
+		deleteFoundItemOwned(item.id, item.postedByUserId)
+	suspend fun updateFoundItemOwned(
+		id: Long,
+		ownerId: Long,
+		title: String,
+		description: String,
+		location: String,
+		category: String,
+		imageName: String
+	): Boolean = foundItems.updateOwned(
+		id, ownerId, title, description, location, category, imageName
+	) > 0
+	suspend fun deleteFoundItemOwned(id: Long, ownerId: Long): Boolean =
+		foundItems.deleteOwned(id, ownerId) > 0
 }
