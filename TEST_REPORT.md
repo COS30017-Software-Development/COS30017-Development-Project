@@ -15,7 +15,7 @@ The testing scope includes authentication, student item posts, search and filter
 | Android Gradle Plugin build | Debug configuration |
 | Compile/Target SDK | 37 |
 | Minimum SDK | 24 |
-| Emulator | Medium_Phone (AVD), API 17 / Android 17 |
+| Emulator | Medium_Phone (AVD), Android 17 / API 37 |
 | Emulator identifier | emulator-5554 |
 | Test date | 2026-11-24 |
 
@@ -66,12 +66,12 @@ The following areas were exercised:
 | RM-005 | Admin Claim Approval / Rejection | Other pending claims after approval | Competing pending claims become REJECTED | Repository integration test passed | PASS |
 | RM-006 | Student / Admin Permission | Student cannot approve/reject or delete as admin | Student receives ACCESS_DENIED/false | Repository integration test passed | PASS |
 | RM-007 | Admin Claim Rejection | Admin rejects a pending claim | Claim becomes REJECTED once and repeated processing is prevented | Repository integration test passed | PASS |
-| RM-008 | Room Database Persistence | Reopen and observe persisted Room data | Database data survives process/database reopen | NOT TESTED - test uses an in-memory Room database | NOT TESTED |
-| E2E-001 | Login / Register | Create a unique account, log in, and log out through the real UI | Account persists and SessionManager login/logout state updates correctly | Repository logic and Auth UI tests exist; no complete create/login/logout automation was added | NOT TESTED |
-| E2E-002 | Student Posts CRUD | Create, edit, delete Lost/Found posts through the real UI | Owner CRUD works and unauthorised users cannot edit/delete | Repository ownership tests pass; no complete Activity UI CRUD automation was added | NOT TESTED |
-| E2E-003 | Admin Dashboard | Open dashboard and filter All/Lost/Found through the real UI | Admin sees both item types and filters correctly | Admin logic source is implemented; no dedicated Activity instrumentation test was added | NOT TESTED |
-| E2E-004 | Admin Claim Approval / Rejection | Approve/reject claims through the real Admin UI | Admin actions update claim/item status once and safely | Repository approve/reject tests pass; no dedicated Admin Activity automation was added | NOT TESTED |
-| E2E-005 | Item Status Management | Display ACTIVE/CLOSED status and prevent claims on CLOSED items | CLOSED item is visible and not claimable | Repository/status policy tests pass; no dedicated closed-item UI automation was added | NOT TESTED |
+| RM-008 | Room Database Persistence | Close and reopen a physical Room database, then update and delete rows | Data survives close/reopen; update and delete remain correct | 1 on-disk database test passed on Medium_Phone API 37 | PASS |
+| E2E-001 | Login / Register | Create a unique account, log in, reject wrong password, and verify/logout session state through the real UI | Registration/login works; wrong credentials do not create a session; logout clears session | 1 real-UI authentication test passed | PASS |
+| E2E-002 | Student Posts CRUD | Create, edit, delete Lost/Found posts through the real UI | Owner CRUD works and unauthorised users cannot edit/delete | Repository ownership tests pass; no complete Create/Edit/Delete Activity automation was added | BLOCKED |
+| E2E-003 | Admin Dashboard | Open dashboard and filter All/Lost/Found through the real UI | Admin sees both item types and filters correctly | Admin dashboard implementation is permission-checked; no dedicated UI automation was added | BLOCKED |
+| E2E-004 | Admin Claim Approval / Rejection | Approve/reject claims through the real Admin UI | Admin actions update claim/item status once and safely | Repository review tests pass; no dedicated Admin Activity automation was added | BLOCKED |
+| E2E-005 | Item Status Management | Display Open/Claimed/Closed status and prevent claims on Closed items | Status is displayed; Closed items reject claims | Repository/status policy tests pass; closed-item details UI has no dedicated instrumentation test | BLOCKED |
 
 ## 5. Test Results
 
@@ -80,8 +80,8 @@ The following areas were exercised:
 | Suite | Executed Methods | Passed | Failed |
 |---|---:|---:|---:|
 | JVM unit tests | 24 | 24 | 0 |
-| Android instrumentation tests | 14 | 14 | 0 |
-| **Total** | **38** | **38** | **0** |
+| Android instrumentation tests | 16 | 16 | 0 |
+| **Total** | **40** | **40** | **0** |
 
 Additional build checks:
 
@@ -97,9 +97,14 @@ No executed test failed. No test error details were reported.
 
 ## 7. Bugs Found and Fixes
 
-No bugs were found in the 38 executed test methods.
+No executed test assertion failed.
 
-No source-code fix was required for the completed test runs.
+Two genuine consistency fixes were made:
+
+1. Found-item statuses were normalized from `ACTIVE` to `OPEN`, with `CLAIMED` and `CLOSED` states and a migration from database version 6 to 7.
+2. Claim submission now changes an item to `CLAIMED`, and rejection reopens it when no pending claims remain.
+
+A test-initialization defect was also fixed: the on-disk Room test now has a void JUnit method, with `runBlocking` inside the method.
 
 ## 8. Retest Results
 
@@ -120,7 +125,7 @@ The final `testDebugUnitTest --rerun-tasks` run also passed with all 24 JVM test
 
 The executable baseline passed completely:
 
-- **38/38 executed tests passed**
+- **40/40 executed tests passed**
 - **0 failed**
 - Debug APK assembly passed
 - Android lint passed

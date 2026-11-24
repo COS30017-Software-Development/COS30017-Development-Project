@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
+import com.example.cos30017developmentproject.auth.SessionManager
 import com.google.android.material.navigation.NavigationView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -20,6 +21,65 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AuthPageTest {
 	private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
+
+	@Test
+	fun registerLoginRejectWrongPasswordAndLogoutThroughRealUi() {
+		val context = InstrumentationRegistry.getInstrumentation().targetContext
+		val session = SessionManager(context)
+		session.logout()
+		val suffix = System.currentTimeMillis()
+		val email = "e2e-$suffix@test.local"
+		val password = "Student1@Pass"
+
+		ActivityScenario.launch(AuthActivity::class.java).use { scenario ->
+			scenario.onActivity { activity ->
+				activity.findViewById<View>(R.id.auth_switch).performClick()
+				activity.findViewById<EditText>(R.id.auth_name).setText("E2E Student")
+				activity.findViewById<EditText>(R.id.auth_student_id).setText("9${suffix.toString().takeLast(8)}")
+				activity.findViewById<EditText>(R.id.auth_email).setText(email)
+				activity.findViewById<EditText>(R.id.auth_password).setText(password)
+				activity.findViewById<EditText>(R.id.auth_confirm_password).setText(password)
+				activity.findViewById<View>(R.id.auth_submit).performClick()
+			}
+			val deadline = android.os.SystemClock.uptimeMillis() + 5000
+			while (session.userId == null && android.os.SystemClock.uptimeMillis() < deadline) {
+				instrumentation.waitForIdleSync()
+				android.os.SystemClock.sleep(50)
+			}
+			assertTrue("Registration should establish a session", session.userId != null)
+		}
+
+		session.logout()
+		assertNull(session.userId)
+
+		ActivityScenario.launch(AuthActivity::class.java).use { scenario ->
+			scenario.onActivity { activity ->
+				activity.findViewById<EditText>(R.id.auth_email).setText(email)
+				activity.findViewById<EditText>(R.id.auth_password).setText("Wrong1@Pass")
+				activity.findViewById<View>(R.id.auth_submit).performClick()
+			}
+			instrumentation.waitForIdleSync()
+			android.os.SystemClock.sleep(500)
+			assertNull("Wrong credentials must not establish a session", session.userId)
+		}
+
+		session.logout()
+		ActivityScenario.launch(AuthActivity::class.java).use { scenario ->
+			scenario.onActivity { activity ->
+				activity.findViewById<EditText>(R.id.auth_email).setText(email)
+				activity.findViewById<EditText>(R.id.auth_password).setText(password)
+				activity.findViewById<View>(R.id.auth_submit).performClick()
+			}
+			val deadline = android.os.SystemClock.uptimeMillis() + 5000
+			while (session.userId == null && android.os.SystemClock.uptimeMillis() < deadline) {
+				instrumentation.waitForIdleSync()
+				android.os.SystemClock.sleep(50)
+			}
+			assertTrue("Correct credentials should establish a session", session.userId != null)
+		}
+		session.logout()
+		assertNull(session.userId)
+	}
 
 	private fun checkAuth(action: (AuthActivity) -> Unit) {
 		val deadline = android.os.SystemClock.uptimeMillis() + 5000

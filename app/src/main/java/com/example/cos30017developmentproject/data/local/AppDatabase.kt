@@ -10,7 +10,7 @@ import com.example.cos30017developmentproject.auth.PasswordHasher
 
 @Database(
 	entities = [UserEntity::class, LostItemEntity::class, FoundItemEntity::class, ClaimEntity::class],
-	version = 6,
+	version = 7,
 	exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -64,6 +64,11 @@ abstract class AppDatabase : RoomDatabase() {
 				db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_claims_claimant_user_id_found_item_id ON claims(claimant_user_id, found_item_id)")
 			}
 		}
+		val MIGRATION_6_7 = object : Migration(6, 7) {
+			override fun migrate(db: SupportSQLiteDatabase) {
+				db.execSQL("UPDATE found_items SET status = 'OPEN' WHERE status = 'ACTIVE'")
+			}
+		}
 
 		@Volatile
 		private var instance: AppDatabase? = null
@@ -73,7 +78,7 @@ abstract class AppDatabase : RoomDatabase() {
 				context.applicationContext,
 				AppDatabase::class.java,
 				DATABASE_NAME
-			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).addCallback(SeedDataCallback()).build().also { instance = it }
+			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).addCallback(SeedDataCallback()).build().also { instance = it }
 		}
 	}
 }
@@ -92,9 +97,9 @@ private class SeedDataCallback : RoomDatabase.Callback() {
 		db.execSQL("INSERT INTO lost_items (title, description, location, category, image_name, posted_by_user_id) VALUES ('Study backpack', 'Lost after an afternoon class. A black bag containing study notes.', 'Classroom', 'Backpack', 'sample_backpack', 2)")
 		db.execSQL("INSERT INTO lost_items (title, description, location, category, image_name, posted_by_user_id) VALUES ('Locker keys', 'Lost near the study area. A small set of keys with a red ring.', 'Study area', 'Keys', 'sample_keys', 1)")
 
-		db.execSQL("INSERT INTO found_items (title, description, location, category, image_name, posted_by_user_id) VALUES ('Black backpack', 'Found near the library entrance. Black backpack with a front zip pocket.', 'Library entrance', 'Backpack', 'sample_backpack', 2)")
-		db.execSQL("INSERT INTO found_items (title, description, location, category, image_name, posted_by_user_id) VALUES ('Headphones', 'Found in a campus study area. Black over-ear headphones.', 'Study area', 'Headphones', 'sample_headphones', 1)")
-		db.execSQL("INSERT INTO found_items (title, description, location, category, image_name, posted_by_user_id) VALUES ('Sports bottle', 'Found near the sports area. A reusable bottle with a screw-top lid.', 'Sports area', 'Bottle', 'sample_bottle', 2)")
+		db.execSQL("INSERT INTO found_items (title, description, location, category, image_name, posted_by_user_id, status) VALUES ('Black backpack', 'Found near the library entrance. Black backpack with a front zip pocket.', 'Library entrance', 'Backpack', 'sample_backpack', 2, 'OPEN')")
+		db.execSQL("INSERT INTO found_items (title, description, location, category, image_name, posted_by_user_id, status) VALUES ('Headphones', 'Found in a campus study area. Black over-ear headphones.', 'Study area', 'Headphones', 'sample_headphones', 1, 'OPEN')")
+		db.execSQL("INSERT INTO found_items (title, description, location, category, image_name, posted_by_user_id, status) VALUES ('Sports bottle', 'Found near the sports area. A reusable bottle with a screw-top lid.', 'Sports area', 'Bottle', 'sample_bottle', 2, 'OPEN')")
 	}
 }
 

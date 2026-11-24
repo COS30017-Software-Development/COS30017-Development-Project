@@ -18,10 +18,10 @@ import org.junit.runner.RunWith
 class LostAndFoundRepositoryTest {
 	private lateinit var database: AppDatabase
 	private lateinit var repository: LostAndFoundRepository
+	private val context get() = ApplicationProvider.getApplicationContext<Context>()
 
 	@Before
 	fun setUp() {
-		val context = ApplicationProvider.getApplicationContext<Context>()
 		database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
 			.allowMainThreadQueries()
 			.build()
@@ -178,5 +178,60 @@ class LostAndFoundRepositoryTest {
 		assertEquals(ClaimStatus.REJECTED, database.claimDao().getById(claim.id)?.status)
 		assertFalse(repository.deleteFoundItemAsAdmin(foundId, studentId))
 		assertTrue(repository.deleteFoundItemAsAdmin(foundId, adminId))
+	}
+
+	@Test
+	fun onDiskRoomDataSurvivesCloseAndReopenWithUpdateAndDelete() {
+		runBlocking {
+			val dbName = "room-persistence-e2e.db"
+			context.deleteDatabase(dbName)
+			val first = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
+				.allowMainThreadQueries()
+				.build()
+			val firstRepository = LostAndFoundRepository(first)
+			val userId = first.userDao().insert(
+				UserEntity(
+					username = "Persistent Student",
+					email = "persistent@test.local",
+					studentId = "400000001"
+				)
+			)
+			val lostId = firstRepository.addLostItem(
+				LostItemEntity(
+					title = "Persistent keys",
+					description = "Inserted before close",
+					location = "Library",
+					category = "Keys",
+					imageName = "sample_keys",
+					postedByUserId = userId
+				)
+			)
+			val foundId = firstRepository.addFoundItem(
+				FoundItemEntity(
+					title = "Persistent bottle",
+					description = "Inserted before reopen",
+					location = "Cafe",
+					category = "Bottle",
+					imageName = "sample_bottle",
+					postedByUserId = userId
+				)
+			)
+			first.close()
+
+			val reopened = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
+				.allowMainThreadQueries()
+				.build()
+			val reopenedRepository = LostAndFoundRepository(reopened)
+			assertEquals("Persistent keys", reopenedRepository.getLostItem(lostId)?.title)
+			assertEquals("Persistent bottle", reopenedRepository.getFoundItem(foundId)?.title)
+			assertTrue(reopenedRepository.updateLostItemOwned(
+				lostId, userId, "Updated persistent keys", "Updated", "Campus", "Keys", "sample_keys"
+			))
+			assertEquals("Updated persistent keys", reopenedRepository.getLostItem(lostId)?.title)
+			assertTrue(reopenedRepository.deleteFoundItemOwned(foundId, userId))
+			assertEquals(null, reopenedRepository.getFoundItem(foundId))
+			reopened.close()
+			context.deleteDatabase(dbName)
+		}
 	}
 }

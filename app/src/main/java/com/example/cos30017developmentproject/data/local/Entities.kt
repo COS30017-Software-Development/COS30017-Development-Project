@@ -56,7 +56,7 @@ data class FoundItemEntity(
 	val category: String,
 	@ColumnInfo(name = "image_name") val imageName: String,
 	@ColumnInfo(name = "posted_by_user_id") val postedByUserId: Long,
-	@ColumnInfo(name = "status") val status: String = ItemStatus.ACTIVE
+	@ColumnInfo(name = "status") val status: String = ItemStatus.OPEN
 )
 
 @Entity(
@@ -96,8 +96,10 @@ object UserRole {
 }
 
 object ItemStatus {
-	const val ACTIVE = "ACTIVE"
+	const val OPEN = "OPEN"
+	const val CLAIMED = "CLAIMED"
 	const val CLOSED = "CLOSED"
+	const val ACTIVE = OPEN
 }
 
 object ClaimStatus {

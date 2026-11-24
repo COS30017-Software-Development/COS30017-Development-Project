@@ -108,6 +108,8 @@ Bring it home.</string >
 	<string name="item_description">Description</string>
 	<string name="item_posted_by">Posted by</string>
 	<string name="item_active">Active</string>
+	<string name="item_open">Open</string>
+	<string name="item_claimed">Claimed</string>
 	<string name="back_to_items">Back to items</string>
 	<string name="item_not_found">This item is no longer available.</string>
 	<string name="item_type_format">%1$s item</string>

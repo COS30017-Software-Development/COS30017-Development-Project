@@ -95,7 +95,11 @@ class ItemDetailsActivity : AppCompatActivity() {
 			getString(if (type == TYPE_FOUND) R.string.found else R.string.lost)
 		)
 		findViewById<TextView>(R.id.item_details_status).setText(
-			if (item.status == ItemStatus.CLOSED) R.string.item_closed else R.string.item_active
+			when (item.status) {
+				ItemStatus.CLOSED -> R.string.item_closed
+				ItemStatus.CLAIMED -> R.string.item_claimed
+				else -> R.string.item_open
+			}
 		)
 		findViewById<TextView>(R.id.item_details_category).text = item.category
 		findViewById<TextView>(R.id.item_details_location).text = item.location
@@ -279,7 +283,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 		val category: String,
 		val imageName: String,
 		val postedByUserId: Long,
-		val status: String = ItemStatus.ACTIVE
+		val status: String = ItemStatus.OPEN
 	)
 
 	companion object {

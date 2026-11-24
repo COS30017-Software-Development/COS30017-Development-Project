@@ -80,7 +80,7 @@ class LostAndFoundRepository(database: AppDatabase) {
 	suspend fun submitClaim(foundItemId: Long, claimantUserId: Long, description: String): ClaimSubmissionResult {
 		val item = foundItems.getById(foundItemId)
 			?: return ClaimSubmissionResult.ITEM_NOT_FOUND
-		if (item.status != ItemStatus.ACTIVE) return ClaimSubmissionResult.ITEM_CLOSED
+		if (item.status == ItemStatus.CLOSED) return ClaimSubmissionResult.ITEM_CLOSED
 		if (item.postedByUserId == claimantUserId) return ClaimSubmissionResult.OWNER_CANNOT_CLAIM
 		if (claims.getByClaimantAndItem(claimantUserId, foundItemId) != null) {
 			return ClaimSubmissionResult.ALREADY_CLAIMED
@@ -100,6 +100,7 @@ class LostAndFoundRepository(database: AppDatabase) {
 					status = ClaimStatus.PENDING
 				)
 			)
+			if (id > 0) foundItems.updateStatusIfOpen(foundItemId, ItemStatus.CLAIMED)
 			if (id > 0) ClaimSubmissionResult.SUCCESS else ClaimSubmissionResult.FAILED
 		} catch (_: Exception) {
 			ClaimSubmissionResult.ALREADY_CLAIMED
@@ -118,8 +119,8 @@ class LostAndFoundRepository(database: AppDatabase) {
 				if (!ClaimReviewPolicy.canProcess(claim.status)) return@withTransaction ClaimReviewResult.ALREADY_PROCESSED
 				val item = foundItems.getById(claim.foundItemId)
 					?: return@withTransaction ClaimReviewResult.ITEM_NOT_FOUND
-				if (item.status != ItemStatus.ACTIVE) return@withTransaction ClaimReviewResult.ITEM_CLOSED
-				if (foundItems.updateStatusIfActive(item.id, ClaimReviewPolicy.approvedItemStatus()) != 1) {
+				if (item.status == ItemStatus.CLOSED) return@withTransaction ClaimReviewResult.ITEM_CLOSED
+				if (foundItems.updateStatusIfNotClosed(item.id, ClaimReviewPolicy.approvedItemStatus()) != 1) {
 					return@withTransaction ClaimReviewResult.ITEM_CLOSED
 				}
 				if (claims.updateStatusIfPending(claimId, ClaimStatus.APPROVED) != 1) {
@@ -141,6 +142,9 @@ class LostAndFoundRepository(database: AppDatabase) {
 					?: return@withTransaction ClaimReviewResult.NOT_FOUND
 				if (!ClaimReviewPolicy.canProcess(claim.status)) return@withTransaction ClaimReviewResult.ALREADY_PROCESSED
 				if (claims.updateStatusIfPending(claimId, ClaimStatus.REJECTED) == 1) {
+					if (claims.countPendingForItem(claim.foundItemId) == 0) {
+						foundItems.updateStatusIfClaimed(claim.foundItemId, ItemStatus.OPEN)
+					}
 					ClaimReviewResult.SUCCESS
 				} else {
 					ClaimReviewResult.ALREADY_PROCESSED

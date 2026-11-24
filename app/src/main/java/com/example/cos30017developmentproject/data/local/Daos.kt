@@ -117,8 +117,14 @@ interface FoundItemDao {
 	@Query("UPDATE found_items SET status = :status WHERE id = :id")
 	suspend fun updateStatus(id: Long, status: String): Int
 
-	@Query("UPDATE found_items SET status = :status WHERE id = :id AND status = 'ACTIVE'")
-	suspend fun updateStatusIfActive(id: Long, status: String): Int
+	@Query("UPDATE found_items SET status = :status WHERE id = :id AND status != 'CLOSED'")
+	suspend fun updateStatusIfNotClosed(id: Long, status: String): Int
+
+	@Query("UPDATE found_items SET status = :status WHERE id = :id AND status = 'OPEN'")
+	suspend fun updateStatusIfOpen(id: Long, status: String): Int
+
+	@Query("UPDATE found_items SET status = :status WHERE id = :id AND status = 'CLAIMED'")
+	suspend fun updateStatusIfClaimed(id: Long, status: String): Int
 }
 
 @Dao
@@ -143,4 +149,7 @@ interface ClaimDao {
 
 	@Query("UPDATE claims SET status = 'REJECTED' WHERE found_item_id = :foundItemId AND id != :approvedClaimId AND status = 'PENDING'")
 	suspend fun rejectOtherPending(foundItemId: Long, approvedClaimId: Long): Int
+
+	@Query("SELECT COUNT(*) FROM claims WHERE found_item_id = :foundItemId AND status = 'PENDING'")
+	suspend fun countPendingForItem(foundItemId: Long): Int
 }
