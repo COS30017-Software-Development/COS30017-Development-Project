@@ -19,6 +19,7 @@ import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.ClaimSubmissionResult
 import com.example.cos30017developmentproject.data.local.ItemStatus
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.example.cos30017developmentproject.data.remote.FirestoreClaimRepository
 import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 class ItemDetailsActivity : AppCompatActivity() {
 	private lateinit var repository: LostAndFoundRepository
 	private lateinit var firestoreRepository: FirestoreItemRepository
+	private lateinit var firestoreClaimRepository: FirestoreClaimRepository
 	private val editItem = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
 		if (result.resultCode == RESULT_OK) {
 			itemIdFromIntent(intent)?.let { loadItem(it, intent.getStringExtra(EXTRA_ITEM_TYPE).orEmpty()) }
@@ -50,6 +52,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 		findViewById<View>(R.id.back_to_items).setOnClickListener { finish() }
 		repository = LostAndFoundRepository(AppDatabase.getInstance(this))
 		firestoreRepository = FirestoreItemRepository()
+		firestoreClaimRepository = FirestoreClaimRepository()
 
 		val id = itemIdFromIntent(intent)
 		val type = intent.getStringExtra(EXTRA_ITEM_TYPE) ?: ""
@@ -79,7 +82,8 @@ class ItemDetailsActivity : AppCompatActivity() {
 							category = it.category,
 							imageName = it.imageName,
 							postedByUid = it.postedBy,
-							status = it.status
+							status = it.status,
+							isFirestoreItem = true
 						)
 					}
 				} else {
@@ -171,8 +175,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 		val claimButton = findViewById<View>(R.id.claim_item)
 		val session = SessionManager(this)
 		val userId = session.userId
-		val roomItemId = item.roomItemId
-		if (type != TYPE_FOUND || roomItemId == null || item.status == ItemStatus.CLOSED ||
+		if (type != TYPE_FOUND || item.status == ItemStatus.CLOSED ||
 			item.postedByUserId == userId ||
 			(item.postedByUid != null && item.postedByUid == firestoreRepository.currentUserUid)
 		) {
@@ -187,14 +190,26 @@ class ItemDetailsActivity : AppCompatActivity() {
 			return
 		}
 		lifecycleScope.launch {
-			val alreadyClaimed = repository.hasClaim(userId, roomItemId)
-			claimButton.isVisible = !alreadyClaimed
-			claimButton.isEnabled = !alreadyClaimed
+			try {
+				val alreadyClaimed = if (item.isFirestoreItem) {
+					firestoreClaimRepository.hasPendingClaim(item.id)
+				} else {
+					val roomItemId = item.roomItemId ?: return@launch
+					repository.hasClaim(userId, roomItemId)
+				}
+				claimButton.isVisible = !alreadyClaimed
+				claimButton.isEnabled = !alreadyClaimed
+			} catch (e: CancellationException) {
+				throw e
+			} catch (e: Exception) {
+				Log.e(TAG, "Unable to check for an existing claim", e)
+				claimButton.isVisible = false
+				Toast.makeText(this@ItemDetailsActivity, R.string.claim_submit_failed, Toast.LENGTH_SHORT).show()
+			}
 		}
 	}
 
 	private fun openClaimDialog(item: ItemDetails) {
-		val roomItemId = item.roomItemId ?: return
 		val userId = SessionManager(this).userId
 		if (userId == null) {
 			startActivity(Intent(this, AuthActivity::class.java))
@@ -217,7 +232,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 					description.length > 500 -> inputLayout.error = getString(R.string.claim_description_too_long)
 					else -> {
 						inputLayout.error = null
-						submitClaim(dialog, roomItemId, userId, description)
+						submitClaim(dialog, item, userId, description)
 					}
 				}
 			}
@@ -225,10 +240,27 @@ class ItemDetailsActivity : AppCompatActivity() {
 		dialog.show()
 	}
 
-	private fun submitClaim(dialog: androidx.appcompat.app.AlertDialog, itemId: Long, userId: Long, description: String) {
+	private fun submitClaim(
+		dialog: androidx.appcompat.app.AlertDialog,
+		item: ItemDetails,
+		userId: Long,
+		description: String
+	) {
 		lifecycleScope.launch {
 			try {
-				val result = repository.submitClaim(itemId, userId, description)
+				val result = if (item.isFirestoreItem) {
+					val applicant = repository.getUser(userId)
+					firestoreClaimRepository.submitClaim(
+						itemId = item.id,
+						description = description,
+						studentName = applicant?.username.orEmpty(),
+						studentEmail = applicant?.email.orEmpty(),
+						studentNumber = applicant?.studentId.orEmpty()
+					)
+				} else {
+					val roomItemId = item.roomItemId ?: return@launch
+					repository.submitClaim(roomItemId, userId, description)
+				}
 				val message = when (result) {
 					ClaimSubmissionResult.SUCCESS -> R.string.claim_submitted
 					ClaimSubmissionResult.ITEM_NOT_FOUND -> R.string.item_not_found
@@ -366,7 +398,8 @@ class ItemDetailsActivity : AppCompatActivity() {
 		val postedByUid: String?,
 		val postedByUserId: Long? = null,
 		val status: String = ItemStatus.OPEN,
-		val roomItemId: Long? = null
+		val roomItemId: Long? = null,
+		val isFirestoreItem: Boolean = false
 	)
 
 	private fun itemIdFromIntent(intent: Intent): String? = intent.getStringExtra(EXTRA_ITEM_ID)

@@ -2,6 +2,8 @@ package com.example.cos30017developmentproject
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -11,16 +13,15 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.auth.SessionManager
-import com.example.cos30017developmentproject.data.local.AppDatabase
-import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.example.cos30017developmentproject.data.remote.FirestoreClaimRepository
 import com.example.cos30017developmentproject.ui.claims.ClaimCard
 import com.example.cos30017developmentproject.ui.claims.ClaimCardAdapter
 import com.google.android.material.appbar.MaterialToolbar
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 class MyClaimsActivity : AppCompatActivity() {
-	private lateinit var repository: LostAndFoundRepository
+	private lateinit var repository: FirestoreClaimRepository
 	private lateinit var sessionManager: SessionManager
 
 	override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,7 +41,7 @@ class MyClaimsActivity : AppCompatActivity() {
 			view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, keyboard.bottom))
 			WindowInsetsCompat.CONSUMED
 		}
-		repository = LostAndFoundRepository(AppDatabase.getInstance(this))
+		repository = FirestoreClaimRepository()
 		findViewById<MaterialToolbar>(R.id.my_claims_toolbar).setNavigationOnClickListener { finish() }
 		val adapter = ClaimCardAdapter { card ->
 			startActivity(Intent(this, ItemDetailsActivity::class.java).apply {
@@ -53,22 +54,29 @@ class MyClaimsActivity : AppCompatActivity() {
 			this.adapter = adapter
 		}
 		lifecycleScope.launch {
-			combine(repository.observeClaims(userId), repository.observeFoundItems()) { claims, foundItems ->
-				claims.mapNotNull { claim ->
-					val foundItem = foundItems.find { it.id == claim.foundItemId }
-						?: return@mapNotNull null
-					ClaimCard(
-						foundItemId = foundItem.id,
-						title = foundItem.title,
-						description = claim.description,
-						status = claim.status,
-						submittedAt = claim.submittedAt
-					)
+			repository.observeMyClaims()
+				.catch { error ->
+					Log.e(TAG, "Unable to load current user's claims", error)
+					Toast.makeText(this@MyClaimsActivity, R.string.claims_load_failed, Toast.LENGTH_SHORT).show()
+					emit(emptyList())
 				}
-			}.collect { cards ->
-				adapter.submitList(cards)
-				findViewById<android.widget.TextView>(R.id.my_claims_empty).isVisible = cards.isEmpty()
-			}
+				.collect { claims ->
+					val cards = claims.map { claim ->
+						ClaimCard(
+							foundItemId = claim.itemId,
+							title = claim.itemTitle,
+							description = claim.description,
+							status = claim.status,
+							submittedAt = claim.submittedAt
+						)
+					}
+					adapter.submitList(cards)
+					findViewById<android.widget.TextView>(R.id.my_claims_empty).isVisible = cards.isEmpty()
+				}
 		}
+	}
+
+	private companion object {
+		const val TAG = "MyClaimsActivity"
 	}
 }

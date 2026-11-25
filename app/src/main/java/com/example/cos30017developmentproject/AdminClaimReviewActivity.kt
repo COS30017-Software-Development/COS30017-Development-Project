@@ -2,6 +2,7 @@ package com.example.cos30017developmentproject
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -12,23 +13,22 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.auth.SessionManager
-import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.ClaimReviewResult
-import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.example.cos30017developmentproject.data.remote.FirestoreClaimRepository
 import com.example.cos30017developmentproject.ui.claims.AdminClaimCard
 import com.example.cos30017developmentproject.ui.claims.AdminClaimCardAdapter
 import com.google.android.material.appbar.MaterialToolbar
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 class AdminClaimReviewActivity : AppCompatActivity() {
-	private lateinit var repository: LostAndFoundRepository
+	private lateinit var repository: FirestoreClaimRepository
 	private lateinit var sessionManager: SessionManager
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 		sessionManager = SessionManager(this)
-		repository = LostAndFoundRepository(AppDatabase.getInstance(this))
+		repository = FirestoreClaimRepository()
 		enableEdgeToEdge()
 		setContentView(R.layout.activity_admin_claim_review)
 		ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.admin_claim_review_root)) { view, insets ->
@@ -41,57 +41,56 @@ class AdminClaimReviewActivity : AppCompatActivity() {
 	}
 
 	private fun verifyAdminAndObserve() {
-		val adminId = sessionManager.userId
-		if (adminId == null) {
+		val adminUid = repository.currentUserUid
+		if (sessionManager.userId == null || adminUid == null) {
 			denyAccess()
 			return
 		}
 		lifecycleScope.launch {
-			if (!repository.isAdmin(adminId)) {
+			if (!repository.isAdmin(adminUid)) {
 				denyAccess()
 				return@launch
 			}
 			val adapter = AdminClaimCardAdapter(
-				onApprove = { card -> reviewClaim(card.claimId, adminId, approve = true) },
-				onReject = { card -> reviewClaim(card.claimId, adminId, approve = false) }
+				onApprove = { card -> reviewClaim(card.claimId, approve = true) },
+				onReject = { card -> reviewClaim(card.claimId, approve = false) }
 			)
 			findViewById<RecyclerView>(R.id.admin_claim_review_list).apply {
 				layoutManager = LinearLayoutManager(this@AdminClaimReviewActivity)
 				this.adapter = adapter
 			}
-			combine(
-				repository.observeAllClaims(),
-				repository.observeUsers(),
-				repository.observeFoundItems()
-			) { claims, users, foundItems ->
-				claims.mapNotNull { claim ->
-					val applicant = users.find { it.id == claim.claimantUserId } ?: return@mapNotNull null
-					val item = foundItems.find { it.id == claim.foundItemId } ?: return@mapNotNull null
-					AdminClaimCard(
-						claimId = claim.id,
-						itemTitle = item.title,
-						itemLocation = item.location,
-						applicantName = applicant.username,
-						applicantEmail = applicant.email,
-						applicantStudentId = applicant.studentId,
-						description = claim.description,
-						status = claim.status,
-						submittedAt = claim.submittedAt
-					)
+			repository.observeAllClaims()
+				.catch { error ->
+					Log.e(TAG, "Unable to load claim requests", error)
+					Toast.makeText(this@AdminClaimReviewActivity, R.string.claims_load_failed, Toast.LENGTH_SHORT).show()
+					emit(emptyList())
 				}
-			}.collect { cards ->
-				adapter.submitList(cards)
-				findViewById<android.widget.TextView>(R.id.admin_claim_review_empty).isVisible = cards.isEmpty()
-			}
+				.collect { claims ->
+					val cards = claims.map { claim ->
+						AdminClaimCard(
+							claimId = claim.claimId,
+							itemTitle = claim.itemTitle,
+							itemLocation = claim.itemLocation,
+							applicantName = claim.studentName,
+							applicantEmail = claim.studentEmail,
+							applicantStudentId = claim.studentNumber,
+							description = claim.description,
+							status = claim.status,
+							submittedAt = claim.submittedAt
+						)
+					}
+					adapter.submitList(cards)
+					findViewById<android.widget.TextView>(R.id.admin_claim_review_empty).isVisible = cards.isEmpty()
+				}
 		}
 	}
 
-	private fun reviewClaim(claimId: Long, adminId: Long, approve: Boolean) {
+	private fun reviewClaim(claimId: String, approve: Boolean) {
 		lifecycleScope.launch {
 			val result = if (approve) {
-				repository.approveClaim(claimId, adminId)
+				repository.approveClaim(claimId)
 			} else {
-				repository.rejectClaim(claimId, adminId)
+				repository.rejectClaim(claimId)
 			}
 			val message = when (result) {
 				ClaimReviewResult.SUCCESS ->
@@ -112,5 +111,9 @@ class AdminClaimReviewActivity : AppCompatActivity() {
 		Toast.makeText(this, R.string.admin_access_denied, Toast.LENGTH_SHORT).show()
 		startActivity(Intent(this, AuthActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
 		finish()
+	}
+
+	private companion object {
+		const val TAG = "AdminClaimReviewActivity"
 	}
 }

@@ -15,6 +15,11 @@ class ClaimValidationTest {
 	}
 
 	@Test
+	fun descriptionAtMaximumIsValid() {
+		assertEquals(ClaimDescriptionValidation.VALID, ClaimValidation.validateDescription("x".repeat(500)))
+	}
+
+	@Test
 	fun descriptionAboveMaximumIsRejected() {
 		assertEquals(
 			ClaimDescriptionValidation.TOO_LONG,

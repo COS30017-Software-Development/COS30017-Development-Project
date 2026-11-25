@@ -1,7 +1,7 @@
 package com.example.cos30017developmentproject.ui.claims
 
 data class AdminClaimCard(
-	val claimId: Long,
+	val claimId: String,
 	val itemTitle: String,
 	val itemLocation: String,
 	val applicantName: String,

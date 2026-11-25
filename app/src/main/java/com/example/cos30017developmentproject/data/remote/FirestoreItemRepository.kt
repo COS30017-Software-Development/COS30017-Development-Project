@@ -84,6 +84,7 @@ class FirestoreItemRepository(
 				FIELD_IMAGE_URL to null,
 				FIELD_IMAGE_NAME to imageName,
 				FIELD_STATUS to STATUS_OPEN,
+				FIELD_PENDING_CLAIM_COUNT to 0,
 				FIELD_POSTED_BY to uid
 			)
 		).await()
@@ -156,6 +157,7 @@ class FirestoreItemRepository(
 		private const val FIELD_IMAGE_URL = "imageUrl"
 		private const val FIELD_IMAGE_NAME = "imageName"
 		private const val FIELD_STATUS = "status"
+		private const val FIELD_PENDING_CLAIM_COUNT = "pendingClaimCount"
 		private const val FIELD_POSTED_BY = "postedBy"
 		private const val DEFAULT_IMAGE_NAME = "sample_backpack"
 	}

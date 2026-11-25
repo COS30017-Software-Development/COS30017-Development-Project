@@ -13,6 +13,61 @@ service cloud.firestore {
       return signedIn() && request.auth.token.role == 'ADMIN';
     }
 
+    function claimPath(studentId, itemId) {
+      return /databases/$(database)/documents/claims/$(studentId + '_' + itemId);
+    }
+
+    function itemPath(itemId) {
+      return /databases/$(database)/documents/items/$(itemId);
+    }
+
+    function pendingClaimCount(data) {
+      return data.get('pendingClaimCount', 0);
+    }
+
+    function validClaim(data, claimId) {
+      return data.keys().hasAll([
+          'claimId', 'itemId', 'studentId', 'description', 'status', 'submittedAt',
+          'itemTitle', 'itemLocation', 'studentName', 'studentEmail', 'studentNumber'
+        ])
+        && data.keys().hasOnly([
+          'claimId', 'itemId', 'studentId', 'description', 'status', 'submittedAt',
+          'itemTitle', 'itemLocation', 'studentName', 'studentEmail', 'studentNumber'
+        ])
+        && data.claimId == claimId
+        && data.itemId is string
+        && data.studentId is string
+        && claimId == data.studentId + '_' + data.itemId
+        && data.description is string
+        && data.description.size() >= 10 && data.description.size() <= 500
+        && data.status in ['PENDING', 'APPROVED', 'REJECTED']
+        && data.submittedAt is timestamp
+        && data.itemTitle is string && data.itemTitle.size() > 0 && data.itemTitle.size() <= 100
+        && data.itemLocation is string && data.itemLocation.size() > 0 && data.itemLocation.size() <= 100
+        && data.studentName is string && data.studentName.size() <= 100
+        && data.studentEmail is string && data.studentEmail.size() <= 254
+        && data.studentNumber is string && data.studentNumber.size() <= 50;
+    }
+
+    function validClaimantUpdate(itemId) {
+      let claim = getAfter(claimPath(request.auth.uid, itemId)).data;
+      return signedIn()
+        && request.resource.data.status == 'CLAIMED'
+        && request.resource.data.type == 'FOUND'
+        && resource.data.type == 'FOUND'
+        && resource.data.postedBy != request.auth.uid
+        && resource.data.status in ['OPEN', 'CLAIMED']
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'pendingClaimCount'])
+        && existsAfter(claimPath(request.auth.uid, itemId))
+        && claim.studentId == request.auth.uid
+        && claim.itemId == itemId
+        && claim.status == 'PENDING'
+        && request.resource.data.pendingClaimCount is int
+        && pendingClaimCount(getAfter(itemPath(itemId)).data)
+          == pendingClaimCount(get(itemPath(itemId)).data) + 1;
+    }
+
     function validItem(data) {
       return data.keys().hasAll([
           'itemId', 'itemName', 'description', 'category', 'location',
@@ -20,7 +75,8 @@ service cloud.firestore {
         ])
         && data.keys().hasOnly([
           'itemId', 'itemName', 'description', 'category', 'location',
-          'date', 'type', 'imageUrl', 'imageName', 'status', 'postedBy'
+          'date', 'type', 'imageUrl', 'imageName', 'status', 'postedBy',
+          'pendingClaimCount'
         ])
         && data.itemId is string
         && data.itemName is string && data.itemName.size() > 0 && data.itemName.size() <= 100
@@ -32,6 +88,8 @@ service cloud.firestore {
         && (data.imageUrl == null || data.imageUrl is string)
         && data.imageName is string && data.imageName.size() > 0 && data.imageName.size() <= 100
         && data.status in ['OPEN', 'CLAIMED', 'CLOSED']
+        && (!data.keys().hasAny(['pendingClaimCount'])
+          || (data.pendingClaimCount is int && data.pendingClaimCount >= 0))
         && data.postedBy is string;
     }
 
@@ -41,6 +99,7 @@ service cloud.firestore {
         && validItem(request.resource.data)
         && request.resource.data.itemId == itemId
         && request.resource.data.postedBy == request.auth.uid
+        && request.resource.data.pendingClaimCount == 0
         && request.resource.data.status == 'OPEN';
       allow update: if isOwner()
         && validItem(request.resource.data)
@@ -51,8 +110,111 @@ service cloud.firestore {
         && request.resource.data.imageUrl == resource.data.imageUrl
         && request.resource.data.status == resource.data.status
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['itemName', 'description', 'category', 'location', 'imageName']);
-      allow delete: if isOwner() || isAdmin();
+          .hasOnly(['itemName', 'description', 'category', 'location', 'imageName'])
+        || (validItem(request.resource.data)
+          && request.resource.data.itemId == resource.data.itemId
+          && request.resource.data.postedBy == resource.data.postedBy
+          && request.resource.data.date == resource.data.date
+          && request.resource.data.type == resource.data.type
+          && request.resource.data.imageUrl == resource.data.imageUrl
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'pendingClaimCount'])
+          && (
+            (isAdmin()
+              && request.resource.data.pendingClaimCount is int
+              && request.resource.data.pendingClaimCount >= 0
+              && (
+                (request.resource.data.status == 'CLOSED'
+                  && request.resource.data.pendingClaimCount == 0)
+                || (
+                  request.resource.data.pendingClaimCount
+                    == pendingClaimCount(resource.data) - 1
+                  && (
+                    (request.resource.data.pendingClaimCount == 0
+                      && request.resource.data.status == 'OPEN')
+                    || (request.resource.data.pendingClaimCount > 0
+                      && request.resource.data.status == 'CLAIMED')
+                  )
+                )
+              ))
+            || validClaimantUpdate(itemId)
+          ));
+      allow delete: if (isOwner() || isAdmin())
+        && pendingClaimCount(resource.data) == 0;
+    }
+
+    match /claims/{claimId} {
+      allow read: if signedIn()
+        && (isAdmin() || resource.data.studentId == request.auth.uid);
+      allow create: if signedIn()
+        && validClaim(request.resource.data, claimId)
+        && request.resource.data.studentId == request.auth.uid
+        && request.resource.data.status == 'PENDING'
+        && exists(itemPath(request.resource.data.itemId))
+        && get(itemPath(request.resource.data.itemId)).data.type == 'FOUND'
+        && get(itemPath(request.resource.data.itemId)).data.postedBy != request.auth.uid
+        && get(itemPath(request.resource.data.itemId)).data.status in ['OPEN', 'CLAIMED']
+        && get(itemPath(request.resource.data.itemId)).data.itemName == request.resource.data.itemTitle
+        && get(itemPath(request.resource.data.itemId)).data.location == request.resource.data.itemLocation
+        && getAfter(itemPath(request.resource.data.itemId)).data.status == 'CLAIMED'
+        && pendingClaimCount(getAfter(itemPath(request.resource.data.itemId)).data)
+          == pendingClaimCount(get(itemPath(request.resource.data.itemId)).data) + 1;
+      allow update: if (
+        isAdmin()
+        && resource.data.status == 'PENDING'
+        && request.resource.data.status in ['APPROVED', 'REJECTED']
+        && validClaim(request.resource.data, claimId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && exists(itemPath(resource.data.itemId))
+        && getAfter(itemPath(resource.data.itemId)).data.status in ['OPEN', 'CLAIMED', 'CLOSED']
+        && (
+          (
+            request.resource.data.status == 'APPROVED'
+            && getAfter(itemPath(resource.data.itemId)).data.status == 'CLOSED'
+            && pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data) == 0
+          )
+          || (
+            request.resource.data.status == 'REJECTED'
+            && (
+              (
+                getAfter(itemPath(resource.data.itemId)).data.status == 'CLOSED'
+                && pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data) == 0
+              )
+              || (
+                pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data)
+                  == pendingClaimCount(get(itemPath(resource.data.itemId)).data) - 1
+                && (
+                  (
+                    pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data) == 0
+                    && getAfter(itemPath(resource.data.itemId)).data.status == 'OPEN'
+                  )
+                  || (
+                    pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data) > 0
+                    && getAfter(itemPath(resource.data.itemId)).data.status == 'CLAIMED'
+                  )
+                )
+              )
+            )
+          )
+        )
+      ) || (
+        signedIn()
+        && resource.data.studentId == request.auth.uid
+        && resource.data.status == 'REJECTED'
+        && request.resource.data.status == 'PENDING'
+        && validClaim(request.resource.data, claimId)
+        && request.resource.data.studentId == resource.data.studentId
+        && request.resource.data.itemId == resource.data.itemId
+        && request.resource.data.claimId == resource.data.claimId
+        && exists(itemPath(resource.data.itemId))
+        && get(itemPath(resource.data.itemId)).data.status in ['OPEN', 'CLAIMED']
+        && get(itemPath(resource.data.itemId)).data.itemName == request.resource.data.itemTitle
+        && get(itemPath(resource.data.itemId)).data.location == request.resource.data.itemLocation
+        && getAfter(itemPath(resource.data.itemId)).data.status == 'CLAIMED'
+        && pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data)
+          == pendingClaimCount(get(itemPath(resource.data.itemId)).data) + 1
+      );
+      allow delete: if false;
     }
   }
 }
