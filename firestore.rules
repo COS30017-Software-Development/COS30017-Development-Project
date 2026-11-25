@@ -167,7 +167,12 @@ service cloud.firestore {
     }
 
     match /claims/{claimId} {
-      allow read: if signedIn()
+      allow get: if signedIn()
+        && (isAdmin()
+          || (!exists(claimDocumentPath(claimId))
+            && claimId.matches('^' + request.auth.uid + '_[A-Za-z0-9]+$'))
+          || resource.data.studentId == request.auth.uid);
+      allow list: if signedIn()
         && (isAdmin() || resource.data.studentId == request.auth.uid);
       allow create: if signedIn()
         && validClaim(request.resource.data, claimId)
