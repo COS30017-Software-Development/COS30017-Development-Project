@@ -85,7 +85,7 @@ class MainActivity : AppCompatActivity() {
 					.collect { items ->
 						val cards = items.map { it.toItemCard(this@MainActivity) }.take(4)
 						itemAdapter.submitList(cards)
-						findViewById<View>(R.id.home_items_empty).isVisible = cards.isEmpty()
+						this@MainActivity.findViewById<View>(R.id.home_items_empty).isVisible = cards.isEmpty()
 					}
 			}
 		}
