@@ -15,7 +15,6 @@ import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.ClaimReviewResult
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
-import com.example.cos30017developmentproject.data.local.UserRole
 import com.example.cos30017developmentproject.ui.claims.AdminClaimCard
 import com.example.cos30017developmentproject.ui.claims.AdminClaimCardAdapter
 import com.google.android.material.appbar.MaterialToolbar
@@ -43,7 +42,7 @@ class AdminClaimReviewActivity : AppCompatActivity() {
 
 	private fun verifyAdminAndObserve() {
 		val adminId = sessionManager.userId
-		if (adminId == null || sessionManager.role != UserRole.ADMIN) {
+		if (adminId == null) {
 			denyAccess()
 			return
 		}

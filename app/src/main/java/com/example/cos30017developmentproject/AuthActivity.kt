@@ -20,11 +20,12 @@ import com.example.cos30017developmentproject.auth.AuthValidator
 import com.example.cos30017developmentproject.auth.FirebaseAuthManager
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.auth.UserRepository
-import com.example.cos30017developmentproject.data.local.UserRole
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Arrays
 
 class AuthActivity : AppCompatActivity() {
@@ -130,12 +131,21 @@ class AuthActivity : AppCompatActivity() {
 					is FirebaseAuthManager.AuthResult.Success -> {
 						val firebaseUser = result.user
 						val localUser = if (registering) {
-							repository.registerFirebaseUser(
-								firebaseUser.uid,
-								text(R.id.auth_name),
-								text(R.id.auth_student_id),
-								firebaseUser.email.orEmpty()
-							)
+							try {
+								repository.registerFirebaseUser(
+									firebaseUser.uid,
+									text(R.id.auth_name),
+									text(R.id.auth_student_id),
+									firebaseUser.email.orEmpty()
+								)
+							} catch (exception: CancellationException) {
+								withContext(NonCancellable) {
+									rollbackRegistration(firebaseUser.uid)
+								}
+								throw exception
+							} catch (exception: Exception) {
+								null
+							}
 						} else {
 							repository.findOrLinkFirebaseUser(
 								firebaseUser.uid,
@@ -143,10 +153,20 @@ class AuthActivity : AppCompatActivity() {
 							)
 						}
 						if (localUser == null) {
-							firebaseAuthManager.signOut()
-							showAuthError(getString(R.string.auth_profile_missing_error), R.id.auth_email_layout)
+							if (registering) {
+								val rolledBack = rollbackRegistration(firebaseUser.uid)
+								val message = if (rolledBack) {
+									R.string.auth_room_save_rolled_back_error
+								} else {
+									R.string.auth_room_save_cleanup_failed_error
+								}
+								showAuthError(getString(message), R.id.auth_email_layout)
+							} else {
+								firebaseAuthManager.signOut()
+								showAuthError(getString(R.string.auth_profile_missing_error), R.id.auth_email_layout)
+							}
 						} else {
-							sessionManager.login(localUser.id, firebaseUser.uid)
+							sessionManager.login(localUser)
 							openAfterLogin()
 						}
 					}
@@ -163,6 +183,15 @@ class AuthActivity : AppCompatActivity() {
 		}
 	}
 
+	private suspend fun rollbackRegistration(firebaseUid: String): Boolean {
+		return try {
+			firebaseAuthManager.deleteCurrentUser(firebaseUid) is
+				FirebaseAuthManager.AccountDeletionResult.Deleted
+		} finally {
+			firebaseAuthManager.signOutIfCurrentUser(firebaseUid)
+		}
+	}
+
 	private fun restoreCurrentSession() {
 		val firebaseUser = firebaseAuthManager.getCurrentUser() ?: return
 		lifecycleScope.launch {
@@ -176,7 +205,7 @@ class AuthActivity : AppCompatActivity() {
 					showAuthError(getString(R.string.auth_profile_missing_error), R.id.auth_email_layout)
 					return@launch
 				}
-				sessionManager.login(localUser.id, firebaseUser.uid)
+				sessionManager.login(localUser)
 				openAfterLogin()
 			} catch (exception: CancellationException) {
 				throw exception
@@ -193,6 +222,7 @@ class AuthActivity : AppCompatActivity() {
 			FirebaseAuthManager.AuthError.INVALID_EMAIL -> R.string.auth_email_error
 			FirebaseAuthManager.AuthError.WEAK_PASSWORD -> R.string.auth_weak_password_error
 			FirebaseAuthManager.AuthError.INVALID_CREDENTIALS -> R.string.auth_credentials_error
+			FirebaseAuthManager.AuthError.USER_DISABLED -> R.string.auth_user_disabled_error
 			FirebaseAuthManager.AuthError.NETWORK -> R.string.auth_network_error
 			FirebaseAuthManager.AuthError.TOO_MANY_REQUESTS -> R.string.auth_too_many_requests_error
 			FirebaseAuthManager.AuthError.EMAIL_PROVIDER_DISABLED -> R.string.auth_provider_disabled_error
@@ -254,13 +284,20 @@ class AuthActivity : AppCompatActivity() {
 	}
 
 	private fun openAfterLogin() {
-		val destination = if (sessionManager.role == UserRole.ADMIN) {
-			AdminDashboardActivity::class.java
-		} else {
-			ProfileActivity::class.java
+		val currentUser = firebaseAuthManager.getCurrentUser()
+		if (currentUser == null || sessionManager.userId == null) {
+			showAuthError(getString(R.string.auth_unexpected_error), R.id.auth_email_layout)
+			return
 		}
-		startActivity(Intent(this, destination).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
-		finish()
+		lifecycleScope.launch {
+			val destination = if (firebaseAuthManager.hasAdminRole(currentUser.uid)) {
+				AdminDashboardActivity::class.java
+			} else {
+				ProfileActivity::class.java
+			}
+			startActivity(Intent(this@AuthActivity, destination).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
+			finish()
+		}
 	}
 
 	private fun setupPasswordVisibility() {

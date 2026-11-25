@@ -2,6 +2,7 @@ package com.example.cos30017developmentproject.auth
 
 import android.content.Context
 import androidx.core.content.edit
+import com.example.cos30017developmentproject.data.local.UserEntity
 import com.example.cos30017developmentproject.data.local.UserRole
 
 class SessionManager(context: Context) {
@@ -18,9 +19,12 @@ class SessionManager(context: Context) {
 	val role: String
 		get() = UserRole.STUDENT
 
-	fun login(userId: Long, firebaseUid: String) {
+	fun login(user: UserEntity) {
+		val firebaseUid = requireNotNull(user.firebaseUid) {
+			"Cannot create a session without a Firebase UID mapping"
+		}
 		preferences.edit {
-			putLong(KEY_USER_ID, userId)
+			putLong(KEY_USER_ID, user.id)
 			putString(KEY_FIREBASE_UID, firebaseUid)
 			remove(KEY_ROLE)
 		}

@@ -14,7 +14,6 @@ import androidx.lifecycle.lifecycleScope
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
-import com.example.cos30017developmentproject.data.local.UserRole
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
@@ -46,7 +45,7 @@ class AdminItemDetailsActivity : AppCompatActivity() {
 	private fun verifyAdminAndLoad() {
 		val adminId = sessionManager.userId
 		if (itemId == INVALID_ITEM_ID || itemType !in setOf(ItemDetailsActivity.TYPE_LOST, ItemDetailsActivity.TYPE_FOUND) ||
-			adminId == null || sessionManager.role != UserRole.ADMIN
+			adminId == null
 		) {
 			denyAccess()
 			return

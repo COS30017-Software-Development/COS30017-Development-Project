@@ -16,7 +16,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
-import com.example.cos30017developmentproject.data.local.UserRole
 import com.example.cos30017developmentproject.ui.home.ItemCard
 import com.example.cos30017developmentproject.ui.home.ItemCardAdapter
 import com.example.cos30017developmentproject.ui.home.toItemCard
@@ -70,7 +69,7 @@ class AdminDashboardActivity : AppCompatActivity() {
 
 	private fun verifyAdminAndObserve() {
 		val adminId = sessionManager.userId
-		if (adminId == null || sessionManager.role != UserRole.ADMIN) {
+		if (adminId == null) {
 			denyAccess()
 			return
 		}
