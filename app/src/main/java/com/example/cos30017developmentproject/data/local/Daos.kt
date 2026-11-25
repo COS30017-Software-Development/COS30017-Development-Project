@@ -153,6 +153,13 @@ interface ClaimDao {
 	@Query("UPDATE claims SET status = :status WHERE id = :id AND status = 'PENDING'")
 	suspend fun updateStatusIfPending(id: Long, status: String): Int
 
+	@Query("""
+		UPDATE claims
+		SET description = :description, status = 'PENDING', submitted_at = :submittedAt
+		WHERE id = :id AND status = 'REJECTED'
+	""")
+	suspend fun resubmitRejected(id: Long, description: String, submittedAt: Long): Int
+
 	@Query("UPDATE claims SET status = 'REJECTED' WHERE found_item_id = :foundItemId AND id != :approvedClaimId AND status = 'PENDING'")
 	suspend fun rejectOtherPending(foundItemId: Long, approvedClaimId: Long): Int
 

@@ -274,6 +274,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 				Toast.makeText(this@ItemDetailsActivity, message, Toast.LENGTH_SHORT).show()
 				if (result == ClaimSubmissionResult.SUCCESS) {
 					dialog.dismiss()
+					findViewById<TextView>(R.id.item_details_status).setText(R.string.item_claimed)
 					findViewById<View>(R.id.claim_item).isEnabled = false
 					findViewById<View>(R.id.claim_item).visibility = View.GONE
 				}

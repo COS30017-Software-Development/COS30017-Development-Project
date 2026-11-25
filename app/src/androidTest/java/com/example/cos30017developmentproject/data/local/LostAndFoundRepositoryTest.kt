@@ -114,6 +114,48 @@ class LostAndFoundRepositoryTest {
 	}
 
 	@Test
+	fun rejectedRoomClaimCanBeResubmittedWithoutCreatingDuplicate() = runBlocking {
+		val ownerId = database.userDao().insert(
+			UserEntity(username = "Owner", email = "resubmit-owner@test.local", studentId = "110000001")
+		)
+		val claimantId = database.userDao().insert(
+			UserEntity(username = "Claimant", email = "resubmit-claimant@test.local", studentId = "110000002")
+		)
+		val foundId = repository.addFoundItem(
+			FoundItemEntity(
+				title = "Umbrella",
+				description = "Umbrella by the entrance",
+				location = "Entrance",
+				category = "Umbrella",
+				imageName = "sample_backpack",
+				postedByUserId = ownerId
+			)
+		)
+
+		assertEquals(
+			ClaimSubmissionResult.SUCCESS,
+			repository.submitClaim(foundId, claimantId, "The umbrella has my initials")
+		)
+		val originalClaim = database.claimDao().getByClaimantAndItem(claimantId, foundId)
+			?: error("Missing original claim")
+		assertEquals(1, database.claimDao().updateStatusIfPending(originalClaim.id, ClaimStatus.REJECTED))
+		assertEquals(1, database.foundItemDao().updateStatusIfClaimed(foundId, ItemStatus.OPEN))
+		assertFalse(repository.hasClaim(claimantId, foundId))
+
+		assertEquals(
+			ClaimSubmissionResult.SUCCESS,
+			repository.submitClaim(foundId, claimantId, "Here is more information about ownership")
+		)
+		val resubmittedClaim = database.claimDao().getByClaimantAndItem(claimantId, foundId)
+			?: error("Missing resubmitted claim")
+		assertEquals(originalClaim.id, resubmittedClaim.id)
+		assertEquals(ClaimStatus.PENDING, resubmittedClaim.status)
+		assertEquals("Here is more information about ownership", resubmittedClaim.description)
+		assertEquals(ItemStatus.CLAIMED, repository.getFoundItem(foundId)?.status)
+		assertEquals(1, database.claimDao().countPendingForItem(foundId))
+	}
+
+	@Test
 	fun localAdminRoleWithoutFirebaseClaimCannotApproveClaims() = runBlocking {
 		val ownerId = database.userDao().insert(
 			UserEntity(username = "Owner", email = "owner2@test.local", studentId = "200000001")

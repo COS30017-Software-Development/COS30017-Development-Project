@@ -77,35 +77,58 @@ class LostAndFoundRepository(database: AppDatabase) {
 	fun observeClaims(userId: Long): Flow<List<ClaimEntity>> = claims.observeByClaimant(userId)
 	fun observeAllClaims(): Flow<List<ClaimEntity>> = claims.observeAll()
 	suspend fun hasClaim(userId: Long, foundItemId: Long): Boolean =
-		claims.getByClaimantAndItem(userId, foundItemId) != null
+		claims.getByClaimantAndItem(userId, foundItemId)
+			?.let { it.status != ClaimStatus.REJECTED } ?: false
 
 	suspend fun submitClaim(foundItemId: Long, claimantUserId: Long, description: String): ClaimSubmissionResult {
-		val item = foundItems.getById(foundItemId)
-			?: return ClaimSubmissionResult.ITEM_NOT_FOUND
-		if (item.status == ItemStatus.CLOSED) return ClaimSubmissionResult.ITEM_CLOSED
-		if (item.postedByUserId == claimantUserId) return ClaimSubmissionResult.OWNER_CANNOT_CLAIM
-		if (claims.getByClaimantAndItem(claimantUserId, foundItemId) != null) {
-			return ClaimSubmissionResult.ALREADY_CLAIMED
-		}
-		val validatedDescription = description.trim()
-		when (ClaimValidation.validateDescription(description)) {
-			ClaimDescriptionValidation.TOO_SHORT -> return ClaimSubmissionResult.DESCRIPTION_TOO_SHORT
-			ClaimDescriptionValidation.TOO_LONG -> return ClaimSubmissionResult.DESCRIPTION_TOO_LONG
-			ClaimDescriptionValidation.VALID -> Unit
-		}
 		return try {
-			val id = claims.insert(
-				ClaimEntity(
-					foundItemId = foundItemId,
-					claimantUserId = claimantUserId,
-					description = validatedDescription,
-					status = ClaimStatus.PENDING
-				)
-			)
-			if (id > 0) foundItems.updateStatusIfOpen(foundItemId, ItemStatus.CLAIMED)
-			if (id > 0) ClaimSubmissionResult.SUCCESS else ClaimSubmissionResult.FAILED
+			database.withTransaction {
+				val item = foundItems.getById(foundItemId)
+					?: return@withTransaction ClaimSubmissionResult.ITEM_NOT_FOUND
+				if (item.status == ItemStatus.CLOSED) {
+					return@withTransaction ClaimSubmissionResult.ITEM_CLOSED
+				}
+				if (item.postedByUserId == claimantUserId) {
+					return@withTransaction ClaimSubmissionResult.OWNER_CANNOT_CLAIM
+				}
+				val existingClaim = claims.getByClaimantAndItem(claimantUserId, foundItemId)
+				if (existingClaim != null && existingClaim.status != ClaimStatus.REJECTED) {
+					return@withTransaction ClaimSubmissionResult.ALREADY_CLAIMED
+				}
+				val validatedDescription = description.trim()
+				when (ClaimValidation.validateDescription(validatedDescription)) {
+					ClaimDescriptionValidation.TOO_SHORT ->
+						return@withTransaction ClaimSubmissionResult.DESCRIPTION_TOO_SHORT
+					ClaimDescriptionValidation.TOO_LONG ->
+						return@withTransaction ClaimSubmissionResult.DESCRIPTION_TOO_LONG
+					ClaimDescriptionValidation.VALID -> Unit
+				}
+
+				val submittedAt = System.currentTimeMillis()
+				val id = if (existingClaim == null) {
+					claims.insert(
+						ClaimEntity(
+							foundItemId = foundItemId,
+							claimantUserId = claimantUserId,
+							description = validatedDescription,
+							status = ClaimStatus.PENDING,
+							submittedAt = submittedAt
+						)
+					)
+				} else {
+					if (claims.resubmitRejected(existingClaim.id, validatedDescription, submittedAt) != 1) {
+						return@withTransaction ClaimSubmissionResult.ALREADY_CLAIMED
+					}
+					existingClaim.id
+				}
+				if (id <= 0) return@withTransaction ClaimSubmissionResult.FAILED
+				foundItems.updateStatusIfOpen(foundItemId, ItemStatus.CLAIMED)
+				ClaimSubmissionResult.SUCCESS
+			}
+		} catch (exception: kotlinx.coroutines.CancellationException) {
+			throw exception
 		} catch (_: Exception) {
-			ClaimSubmissionResult.ALREADY_CLAIMED
+			ClaimSubmissionResult.FAILED
 		}
 	}
 

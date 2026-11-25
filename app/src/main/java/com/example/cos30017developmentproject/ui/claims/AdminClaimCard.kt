@@ -9,5 +9,6 @@ data class AdminClaimCard(
 	val applicantStudentId: String,
 	val description: String,
 	val status: String,
-	val submittedAt: Long
+	val submittedAt: Long,
+	val canApprove: Boolean = true
 )

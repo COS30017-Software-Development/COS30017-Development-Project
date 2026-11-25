@@ -49,7 +49,9 @@ class AdminClaimCardAdapter(
 			val submitted = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(card.submittedAt))
 			date.text = itemView.context.getString(R.string.admin_claim_submitted) + ": " + submitted
 			actions.visibility = if (card.status == ClaimStatus.PENDING) View.VISIBLE else View.GONE
-			itemView.findViewById<View>(R.id.admin_claim_approve).setOnClickListener { onApprove(card) }
+			val approve = itemView.findViewById<View>(R.id.admin_claim_approve)
+			approve.visibility = if (card.canApprove) View.VISIBLE else View.GONE
+			approve.setOnClickListener { onApprove(card) }
 			itemView.findViewById<View>(R.id.admin_claim_reject).setOnClickListener { onReject(card) }
 		}
 	}

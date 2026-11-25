@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.auth.SessionManager
+import com.example.cos30017developmentproject.data.local.ClaimStatus
 import com.example.cos30017developmentproject.data.local.ClaimReviewResult
 import com.example.cos30017developmentproject.data.remote.FirestoreClaimRepository
 import com.example.cos30017developmentproject.ui.claims.AdminClaimCard
@@ -66,6 +67,10 @@ class AdminClaimReviewActivity : AppCompatActivity() {
 					emit(emptyList())
 				}
 				.collect { claims ->
+					val approvedItemIds = claims.asSequence()
+						.filter { it.status == ClaimStatus.APPROVED }
+						.map { it.itemId }
+						.toSet()
 					val cards = claims.map { claim ->
 						AdminClaimCard(
 							claimId = claim.claimId,
@@ -76,7 +81,8 @@ class AdminClaimReviewActivity : AppCompatActivity() {
 							applicantStudentId = claim.studentNumber,
 							description = claim.description,
 							status = claim.status,
-							submittedAt = claim.submittedAt
+							submittedAt = claim.submittedAt,
+							canApprove = claim.itemId !in approvedItemIds
 						)
 					}
 					adapter.submitList(cards)
