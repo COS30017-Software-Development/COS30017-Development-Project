@@ -41,10 +41,6 @@ class AuthActivity : AppCompatActivity() {
 		repository = UserRepository(AppDatabase.getInstance(this).userDao())
 		sessionManager = SessionManager(this)
 		firebaseAuthManager = FirebaseAuthManager()
-		if (sessionManager.userId != null) {
-			openAfterLogin()
-			return
-		}
 		ViewCompat.setAccessibilityHeading(findViewById(R.id.auth_title), true)
 		val page = findViewById<View>(R.id.auth_page)
 		ViewCompat.setOnApplyWindowInsetsListener(page) { view, insets ->

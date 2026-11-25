@@ -114,7 +114,7 @@ class LostAndFoundRepositoryTest {
 	}
 
 	@Test
-	fun approveClaimClosesFoundItemAndRejectsOtherPendingClaims() = runBlocking {
+	fun localAdminRoleWithoutFirebaseClaimCannotApproveClaims() = runBlocking {
 		val ownerId = database.userDao().insert(
 			UserEntity(username = "Owner", email = "owner2@test.local", studentId = "200000001")
 		)
@@ -141,12 +141,12 @@ class LostAndFoundRepositoryTest {
 		assertEquals(ClaimSubmissionResult.SUCCESS, repository.submitClaim(foundId, claimant2, "Watch belongs to claimant two"))
 		val approvedId = database.claimDao().getByClaimantAndItem(claimant1, foundId)?.id ?: error("Missing claim")
 
-		assertEquals(ClaimReviewResult.SUCCESS, repository.approveClaim(approvedId, adminId))
-		assertEquals(ItemStatus.CLOSED, repository.getFoundItem(foundId)?.status)
-		assertEquals(ClaimStatus.APPROVED, database.claimDao().getById(approvedId)?.status)
+		assertEquals(ClaimReviewResult.ACCESS_DENIED, repository.approveClaim(approvedId, adminId))
+		assertEquals(ItemStatus.CLAIMED, repository.getFoundItem(foundId)?.status)
+		assertEquals(ClaimStatus.PENDING, database.claimDao().getById(approvedId)?.status)
 		val rejectedId = database.claimDao().getByClaimantAndItem(claimant2, foundId)?.id ?: error("Missing claim")
-		assertEquals(ClaimStatus.REJECTED, database.claimDao().getById(rejectedId)?.status)
-		assertEquals(ClaimReviewResult.ALREADY_PROCESSED, repository.approveClaim(approvedId, adminId))
+		assertEquals(ClaimStatus.PENDING, database.claimDao().getById(rejectedId)?.status)
+		assertEquals(ClaimReviewResult.ACCESS_DENIED, repository.approveClaim(approvedId, adminId))
 	}
 
 	@Test
@@ -174,10 +174,11 @@ class LostAndFoundRepositoryTest {
 		val claim = database.claimDao().getByClaimantAndItem(claimantId, foundId) ?: error("Missing claim")
 
 		assertEquals(ClaimReviewResult.ACCESS_DENIED, repository.rejectClaim(claim.id, studentId))
-		assertEquals(ClaimReviewResult.SUCCESS, repository.rejectClaim(claim.id, adminId))
-		assertEquals(ClaimStatus.REJECTED, database.claimDao().getById(claim.id)?.status)
+		assertEquals(ClaimReviewResult.ACCESS_DENIED, repository.rejectClaim(claim.id, adminId))
+		assertEquals(ClaimStatus.PENDING, database.claimDao().getById(claim.id)?.status)
 		assertFalse(repository.deleteFoundItemAsAdmin(foundId, studentId))
-		assertTrue(repository.deleteFoundItemAsAdmin(foundId, adminId))
+		assertFalse(repository.deleteFoundItemAsAdmin(foundId, adminId))
+		assertNotNull(repository.getFoundItem(foundId))
 	}
 
 	@Test

@@ -47,14 +47,7 @@ class FirebaseAuthManager(
 	suspend fun hasAdminRole(firebaseUid: String): Boolean {
 		val user = firebaseAuth.currentUser ?: return false
 		if (user.uid != firebaseUid) return false
-		return try {
-			hasAdminRoleClaim(user.getIdToken(true).await().claims)
-		} catch (exception: CancellationException) {
-			throw exception
-		} catch (exception: FirebaseException) {
-			Log.w(TAG, "Unable to refresh the ID token for admin claim verification", exception)
-			false
-		}
+		return hasAdminRoleAfterRefresh { user.getIdToken(true).await().claims }
 	}
 
 	suspend fun register(email: String, password: String): AuthResult = authenticate {
@@ -117,14 +110,25 @@ class FirebaseAuthManager(
 		internal fun hasAdminRoleClaim(claims: Map<String, Any>): Boolean =
 			claims["role"] == "ADMIN"
 
+		internal suspend fun hasAdminRoleAfterRefresh(
+			getClaims: suspend () -> Map<String, Any>
+		): Boolean = try {
+			hasAdminRoleClaim(getClaims())
+		} catch (exception: CancellationException) {
+			throw exception
+		} catch (exception: FirebaseException) {
+			Log.w(TAG, "Unable to refresh the ID token for admin claim verification", exception)
+			false
+		}
+
 		internal fun errorForCode(code: String?): AuthError = when (
 			code?.lowercase()?.removePrefix("error_")?.replace('_', '-')
 		) {
 			"email-already-in-use" -> AuthError.EMAIL_ALREADY_IN_USE
 			"invalid-email" -> AuthError.INVALID_EMAIL
 			"weak-password" -> AuthError.WEAK_PASSWORD
-			"wrong-password", "user-not-found", "invalid-credential",
-			"invalid-login-credentials" -> AuthError.INVALID_CREDENTIALS
+			"wrong-password", "invalid-password", "user-not-found", "email-not-found",
+			"invalid-credential", "invalid-login-credentials" -> AuthError.INVALID_CREDENTIALS
 			"user-disabled" -> AuthError.USER_DISABLED
 			"too-many-requests" -> AuthError.TOO_MANY_REQUESTS
 			"operation-not-allowed" -> AuthError.EMAIL_PROVIDER_DISABLED

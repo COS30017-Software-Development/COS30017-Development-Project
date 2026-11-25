@@ -24,11 +24,12 @@ class AuthPageTest {
 
 	@Test
 	fun registerLoginRejectWrongPasswordAndLogoutThroughRealUi() {
+		FirebaseAuthEmulatorConfig.requireConfigured()
 		val context = InstrumentationRegistry.getInstrumentation().targetContext
 		val session = SessionManager(context)
 		session.logout()
 		val suffix = System.currentTimeMillis()
-		val email = "e2e-$suffix@test.local"
+		val email = "e2e-$suffix@example.test"
 		val password = "Student1@Pass"
 
 		ActivityScenario.launch(AuthActivity::class.java).use { scenario ->
@@ -102,6 +103,7 @@ class AuthPageTest {
 
 	@Test
 	fun protectedEntriesOpenLoginAndBackReturnsHome() {
+		SessionManager(InstrumentationRegistry.getInstrumentation().targetContext).logout()
 		for (entry in listOf(
 			R.id.nav_profile, R.id.nav_post, R.id.drawer_profile, R.id.drawer_post
 		)) {
@@ -134,6 +136,16 @@ class AuthPageTest {
 	}
 
 	@Test
+	fun directlyLaunchedMyPostsRequiresAuthentication() {
+		SessionManager(InstrumentationRegistry.getInstrumentation().targetContext).logout()
+		ActivityScenario.launch(MyPostsActivity::class.java).use {
+			checkAuth { activity ->
+				assertTrue(activity.findViewById<View>(R.id.auth_email).isShown)
+			}
+		}
+	}
+
+	@Test
 	fun registrationHasAllFieldsAndSurvivesRecreation() {
 		ActivityScenario.launch(AuthActivity::class.java).use { scenario ->
 			scenario.onActivity { it.findViewById<View>(R.id.auth_switch).performClick() }
@@ -158,55 +170,33 @@ class AuthPageTest {
 	}
 
 	@Test
-	fun passwordRequirementsUpdateIndividuallyAndOnlyAppearOnRegistration() {
+	fun passwordValidationIsDelegatedToFirebaseAndConfirmationStillMatches() {
 		ActivityScenario.launch(AuthActivity::class.java).use { scenario ->
 			scenario.onActivity { activity ->
 				val requirements = activity.findViewById<View>(R.id.auth_password_requirements)
 				val password = activity.findViewById<EditText>(R.id.auth_password)
 				val confirmation = activity.findViewById<EditText>(R.id.auth_confirm_password)
-				val rules = listOf(
-					R.id.password_requirement_length,
-					R.id.password_requirement_digit,
-					R.id.password_requirement_special,
-					R.id.password_requirement_uppercase,
-					R.id.password_requirement_lowercase
-				)
-
-				fun color(id: Int) = activity.findViewById<TextView>(id).currentTextColor
-				fun expected(id: Int) = ContextCompat.getColor(activity, id)
+				val firebaseNotice = activity.findViewById<TextView>(R.id.password_requirement_firebase)
+				val match = activity.findViewById<TextView>(R.id.password_requirement_match)
 				assertEquals(View.GONE, requirements.visibility)
 				activity.findViewById<View>(R.id.auth_switch).performClick()
 				assertEquals(View.VISIBLE, requirements.visibility)
-				rules.forEach { assertEquals(expected(R.color.text_secondary), color(it)) }
-				password.setText("a")
-				assertEquals(expected(R.color.brand_red_accessible), color(R.id.password_requirement_match))
+				assertTrue(firebaseNotice.text.contains("Firebase Authentication"))
+				activity.findViewById<EditText>(R.id.auth_name).setText("Student")
+				activity.findViewById<EditText>(R.id.auth_student_id).setText("123456789")
+				activity.findViewById<EditText>(R.id.auth_email).setText("student@example.test")
+				password.setText("simple")
 				assertEquals(
-					expected(R.color.text_secondary),
-					color(R.id.password_requirement_lowercase)
+					ContextCompat.getColor(activity, R.color.brand_red_accessible),
+					match.currentTextColor
 				)
-				rules.filter { it != R.id.password_requirement_lowercase }.forEach {
-					assertEquals(expected(R.color.brand_red_accessible), color(it))
-				}
-				for (value in listOf("Aa1!abcd", "Aa1!abcdefghijkl")) {
-					password.setText(value)
-					rules.forEach {
-						assertEquals(
-							expected(R.color.text_secondary), color(it)
-						)
-					}
-				}
+				assertFalse(activity.findViewById<View>(R.id.auth_submit).isEnabled)
 				confirmation.setText(password.text)
-				assertEquals(expected(R.color.text_secondary), color(R.id.password_requirement_match))
-				password.setText("Aa1!abcdefghijklM")
 				assertEquals(
-					expected(R.color.brand_red_accessible), color(R.id.password_requirement_length)
+					ContextCompat.getColor(activity, R.color.text_secondary),
+					match.currentTextColor
 				)
-				password.setText("Aa1 abcdef")
-				assertEquals(
-					expected(R.color.brand_red_accessible), color(R.id.password_requirement_special)
-				)
-				password.setText("")
-				rules.forEach { assertEquals(expected(R.color.text_secondary), color(it)) }
+				assertTrue(activity.findViewById<View>(R.id.auth_submit).isEnabled)
 				activity.findViewById<View>(R.id.auth_switch).performClick()
 				assertEquals(View.GONE, requirements.visibility)
 			}
