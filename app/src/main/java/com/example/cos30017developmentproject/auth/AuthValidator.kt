@@ -7,10 +7,4 @@ object AuthValidator {
 	fun isStudentIdValid(studentId: String) = studentId.matches(Regex("\\d{9}"))
 
 	fun isEmailValid(email: String) = email.trim().let { '@' in it && '.' in it }
-
-	fun isPasswordValid(password: String) = password.length in 8..16 &&
-		password.any(Char::isDigit) &&
-		password.any { !it.isLetterOrDigit() && !it.isWhitespace() } &&
-		password.any(Char::isUpperCase) &&
-		password.any(Char::isLowerCase)
 }

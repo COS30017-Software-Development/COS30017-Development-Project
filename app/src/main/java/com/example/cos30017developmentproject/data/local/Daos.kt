@@ -19,6 +19,12 @@ interface UserDao {
 	@Query("SELECT * FROM users WHERE email = :email COLLATE NOCASE LIMIT 1")
 	suspend fun getByEmail(email: String): UserEntity?
 
+	@Query("SELECT * FROM users WHERE firebase_uid = :firebaseUid LIMIT 1")
+	suspend fun getByFirebaseUid(firebaseUid: String): UserEntity?
+
+	@Query("UPDATE users SET firebase_uid = :firebaseUid WHERE id = :id AND (firebase_uid IS NULL OR firebase_uid = :firebaseUid)")
+	suspend fun attachFirebaseUid(id: Long, firebaseUid: String): Int
+
 	@Insert(onConflict = OnConflictStrategy.ABORT)
 	suspend fun insert(user: UserEntity): Long
 

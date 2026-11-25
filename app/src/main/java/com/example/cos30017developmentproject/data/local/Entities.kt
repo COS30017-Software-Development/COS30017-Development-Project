@@ -6,7 +6,13 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "users", indices = [Index(value = ["email"], unique = true)])
+@Entity(
+	tableName = "users",
+	indices = [
+		Index(value = ["email"], unique = true),
+		Index(value = ["firebase_uid"], unique = true)
+	]
+)
 data class UserEntity(
 	@PrimaryKey(autoGenerate = true) val id: Long = 0,
 	val username: String,
@@ -15,7 +21,8 @@ data class UserEntity(
 	@ColumnInfo(name = "avatar_path") val avatarPath: String? = null,
 	@ColumnInfo(name = "password_hash") val passwordHash: ByteArray? = null,
 	@ColumnInfo(name = "password_salt") val passwordSalt: ByteArray? = null,
-	@ColumnInfo(name = "role") val role: String = UserRole.STUDENT
+	@ColumnInfo(name = "role") val role: String = UserRole.STUDENT,
+	@ColumnInfo(name = "firebase_uid") val firebaseUid: String? = null
 )
 
 @Entity(

@@ -187,47 +187,11 @@
 				android:visibility = "gone" >
 
 				<TextView
-					android:id = "@+id/password_requirement_length"
+					android:id = "@+id/password_requirement_firebase"
 					android:layout_width = "match_parent"
 					android:layout_height = "wrap_content"
 					android:paddingTop = "4dp"
-					android:text = "@string/password_requirement_length"
-					android:textColor = "@color/text_secondary"
-					android:textSize = "12sp" />
-
-				<TextView
-					android:id = "@+id/password_requirement_digit"
-					android:layout_width = "match_parent"
-					android:layout_height = "wrap_content"
-					android:paddingTop = "4dp"
-					android:text = "@string/password_requirement_digit"
-					android:textColor = "@color/text_secondary"
-					android:textSize = "12sp" />
-
-				<TextView
-					android:id = "@+id/password_requirement_special"
-					android:layout_width = "match_parent"
-					android:layout_height = "wrap_content"
-					android:paddingTop = "4dp"
-					android:text = "@string/password_requirement_special"
-					android:textColor = "@color/text_secondary"
-					android:textSize = "12sp" />
-
-				<TextView
-					android:id = "@+id/password_requirement_uppercase"
-					android:layout_width = "match_parent"
-					android:layout_height = "wrap_content"
-					android:paddingTop = "4dp"
-					android:text = "@string/password_requirement_uppercase"
-					android:textColor = "@color/text_secondary"
-					android:textSize = "12sp" />
-
-				<TextView
-					android:id = "@+id/password_requirement_lowercase"
-					android:layout_width = "match_parent"
-					android:layout_height = "wrap_content"
-					android:paddingTop = "4dp"
-					android:text = "@string/password_requirement_lowercase"
+					android:text = "@string/auth_password_firebase_validation"
 					android:textColor = "@color/text_secondary"
 					android:textSize = "12sp" />
 

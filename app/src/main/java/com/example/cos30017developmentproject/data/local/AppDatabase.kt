@@ -10,7 +10,7 @@ import com.example.cos30017developmentproject.auth.PasswordHasher
 
 @Database(
 	entities = [UserEntity::class, LostItemEntity::class, FoundItemEntity::class, ClaimEntity::class],
-	version = 7,
+	version = 8,
 	exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -69,6 +69,12 @@ abstract class AppDatabase : RoomDatabase() {
 				db.execSQL("UPDATE found_items SET status = 'OPEN' WHERE status = 'ACTIVE'")
 			}
 		}
+		val MIGRATION_7_8 = object : Migration(7, 8) {
+			override fun migrate(db: SupportSQLiteDatabase) {
+				db.execSQL("ALTER TABLE users ADD COLUMN firebase_uid TEXT")
+				db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_users_firebase_uid ON users(firebase_uid)")
+			}
+		}
 
 		@Volatile
 		private var instance: AppDatabase? = null
@@ -78,7 +84,7 @@ abstract class AppDatabase : RoomDatabase() {
 				context.applicationContext,
 				AppDatabase::class.java,
 				DATABASE_NAME
-			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).addCallback(SeedDataCallback()).build().also { instance = it }
+			).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).addCallback(SeedDataCallback()).build().also { instance = it }
 		}
 	}
 }

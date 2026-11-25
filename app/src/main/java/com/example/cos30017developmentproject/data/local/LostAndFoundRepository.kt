@@ -1,5 +1,6 @@
 package com.example.cos30017developmentproject.data.local
 
+import com.example.cos30017developmentproject.auth.FirebaseAuthManager
 import kotlinx.coroutines.flow.Flow
 import androidx.room.withTransaction
 
@@ -107,8 +108,10 @@ class LostAndFoundRepository(database: AppDatabase) {
 		}
 	}
 
-	suspend fun isAdmin(userId: Long): Boolean =
-		users.getById(userId)?.role == UserRole.ADMIN
+	suspend fun isAdmin(userId: Long): Boolean {
+		val firebaseUid = users.getById(userId)?.firebaseUid ?: return false
+		return FirebaseAuthManager().hasAdminRole(firebaseUid)
+	}
 
 	suspend fun approveClaim(claimId: Long, adminId: Long): ClaimReviewResult {
 		if (!isAdmin(adminId)) return ClaimReviewResult.ACCESS_DENIED

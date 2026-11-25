@@ -17,11 +17,13 @@ import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import com.example.cos30017developmentproject.auth.AuthValidator
+import com.example.cos30017developmentproject.auth.FirebaseAuthManager
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.auth.UserRepository
 import com.example.cos30017developmentproject.data.local.UserRole
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.google.android.material.textfield.TextInputLayout
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.util.Arrays
 
@@ -29,6 +31,7 @@ class AuthActivity : AppCompatActivity() {
 	private var registering = false
 	private lateinit var repository: UserRepository
 	private lateinit var sessionManager: SessionManager
+	private lateinit var firebaseAuthManager: FirebaseAuthManager
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -36,6 +39,7 @@ class AuthActivity : AppCompatActivity() {
 		setContentView(R.layout.activity_auth)
 		repository = UserRepository(AppDatabase.getInstance(this).userDao())
 		sessionManager = SessionManager(this)
+		firebaseAuthManager = FirebaseAuthManager()
 		if (sessionManager.userId != null) {
 			openAfterLogin()
 			return
@@ -76,6 +80,7 @@ class AuthActivity : AppCompatActivity() {
 		setupPasswordVisibility()
 		findViewById<View>(R.id.auth_submit).setOnClickListener { submit() }
 		showForm(savedInstanceState?.getBoolean("auth.registering") ?: false)
+		restoreCurrentSession()
 	}
 
 	override fun onSaveInstanceState(outState: Bundle) {
@@ -104,7 +109,7 @@ class AuthActivity : AppCompatActivity() {
 			text(R.id.auth_name).isNotEmpty() &&
 				text(R.id.auth_student_id).isNotEmpty() &&
 				text(R.id.auth_email).isNotEmpty() &&
-				AuthValidator.isPasswordValid(password) &&
+				password.isNotEmpty() &&
 				password == text(R.id.auth_confirm_password)
 		} else text(R.id.auth_email).isNotEmpty() && password.isNotEmpty()
 	}
@@ -115,32 +120,93 @@ class AuthActivity : AppCompatActivity() {
 		val password = text(R.id.auth_password).toCharArray()
 		findViewById<View>(R.id.auth_submit).isEnabled = false
 		lifecycleScope.launch {
-			val result = try {
-				if (registering) repository.register(
-					text(R.id.auth_name), text(R.id.auth_student_id), text(R.id.auth_email), password
-				) else repository.login(text(R.id.auth_email), password)
+			try {
+				val result = if (registering) {
+					firebaseAuthManager.register(text(R.id.auth_email), password.concatToString())
+				} else {
+					firebaseAuthManager.login(text(R.id.auth_email), password.concatToString())
+				}
+				when (result) {
+					is FirebaseAuthManager.AuthResult.Success -> {
+						val firebaseUser = result.user
+						val localUser = if (registering) {
+							repository.registerFirebaseUser(
+								firebaseUser.uid,
+								text(R.id.auth_name),
+								text(R.id.auth_student_id),
+								firebaseUser.email.orEmpty()
+							)
+						} else {
+							repository.findOrLinkFirebaseUser(
+								firebaseUser.uid,
+								firebaseUser.email.orEmpty()
+							)
+						}
+						if (localUser == null) {
+							firebaseAuthManager.signOut()
+							showAuthError(getString(R.string.auth_profile_missing_error), R.id.auth_email_layout)
+						} else {
+							sessionManager.login(localUser.id, firebaseUser.uid)
+							openAfterLogin()
+						}
+					}
+					is FirebaseAuthManager.AuthResult.Failure -> showAuthError(result.error)
+				}
+			} catch (exception: CancellationException) {
+				throw exception
+			} catch (exception: Exception) {
+				firebaseAuthManager.signOut()
+				showAuthError(getString(R.string.auth_unexpected_error), R.id.auth_email_layout)
 			} finally {
 				Arrays.fill(password, '\u0000')
 			}
-			when (result) {
-				is UserRepository.AuthResult.Success -> {
-					sessionManager.login(result.user.id, result.user.role)
-					openAfterLogin()
+		}
+	}
+
+	private fun restoreCurrentSession() {
+		val firebaseUser = firebaseAuthManager.getCurrentUser() ?: return
+		lifecycleScope.launch {
+			try {
+				val localUser = repository.findOrLinkFirebaseUser(
+					firebaseUser.uid,
+					firebaseUser.email.orEmpty()
+				)
+				if (localUser == null) {
+					firebaseAuthManager.signOut()
+					showAuthError(getString(R.string.auth_profile_missing_error), R.id.auth_email_layout)
+					return@launch
 				}
-				UserRepository.AuthResult.DuplicateEmail -> {
-					layout(R.id.auth_email_layout).error = getString(R.string.auth_duplicate_email_error)
-					updateSubmitState()
-				}
-				UserRepository.AuthResult.InvalidCredentials -> {
-					layout(R.id.auth_password_layout).error = getString(R.string.auth_credentials_error)
-					updateSubmitState()
-				}
-				UserRepository.AuthResult.InvalidRegistration -> {
-					validateRegistration()
-					updateSubmitState()
-				}
+				sessionManager.login(localUser.id, firebaseUser.uid)
+				openAfterLogin()
+			} catch (exception: CancellationException) {
+				throw exception
+			} catch (exception: Exception) {
+				firebaseAuthManager.signOut()
+				showAuthError(getString(R.string.auth_unexpected_error), R.id.auth_email_layout)
 			}
 		}
+	}
+
+	private fun showAuthError(error: FirebaseAuthManager.AuthError) {
+		val message = when (error) {
+			FirebaseAuthManager.AuthError.EMAIL_ALREADY_IN_USE -> R.string.auth_duplicate_email_error
+			FirebaseAuthManager.AuthError.INVALID_EMAIL -> R.string.auth_email_error
+			FirebaseAuthManager.AuthError.WEAK_PASSWORD -> R.string.auth_weak_password_error
+			FirebaseAuthManager.AuthError.INVALID_CREDENTIALS -> R.string.auth_credentials_error
+			FirebaseAuthManager.AuthError.NETWORK -> R.string.auth_network_error
+			FirebaseAuthManager.AuthError.TOO_MANY_REQUESTS -> R.string.auth_too_many_requests_error
+			FirebaseAuthManager.AuthError.EMAIL_PROVIDER_DISABLED -> R.string.auth_provider_disabled_error
+			FirebaseAuthManager.AuthError.UNKNOWN -> R.string.auth_unexpected_error
+		}
+		val target = if (error == FirebaseAuthManager.AuthError.INVALID_CREDENTIALS ||
+			error == FirebaseAuthManager.AuthError.WEAK_PASSWORD
+		) R.id.auth_password_layout else R.id.auth_email_layout
+		showAuthError(getString(message), target)
+	}
+
+	private fun showAuthError(message: String, targetLayout: Int) {
+		layout(targetLayout).error = message
+		updateSubmitState()
 	}
 
 	private fun validateRegistration(): Boolean {
@@ -155,10 +221,6 @@ class AuthActivity : AppCompatActivity() {
 		}
 		if (!AuthValidator.isEmailValid(text(R.id.auth_email))) {
 			layout(R.id.auth_email_layout).error = getString(R.string.auth_email_error)
-			valid = false
-		}
-		if (!AuthValidator.isPasswordValid(text(R.id.auth_password))) {
-			layout(R.id.auth_password_layout).error = getString(R.string.auth_password_error)
 			valid = false
 		}
 		if (text(R.id.auth_password) != text(R.id.auth_confirm_password)) {
@@ -226,20 +288,6 @@ class AuthActivity : AppCompatActivity() {
 	private fun updatePasswordRequirements() {
 		val password = findViewById<EditText>(R.id.auth_password).text.toString()
 		val confirmation = findViewById<EditText>(R.id.auth_confirm_password).text.toString()
-		val requirements = listOf(
-			R.id.password_requirement_length to (password.length in 8 .. 16),
-			R.id.password_requirement_digit to password.any { it in '0' .. '9' },
-			R.id.password_requirement_special to password.any { !it.isLetterOrDigit() && !it.isWhitespace() },
-			R.id.password_requirement_uppercase to password.any { it.isUpperCase() },
-			R.id.password_requirement_lowercase to password.any { it.isLowerCase() })
-		for ((id, met) in requirements) {
-			val color = when {
-				password.isEmpty() -> R.color.text_secondary
-				met -> R.color.text_secondary
-				else -> R.color.brand_red_accessible
-			}
-			findViewById<TextView>(id).setTextColor(ContextCompat.getColor(this, color))
-		}
 		val matchColor = if (password == confirmation) R.color.text_secondary else R.color.brand_red_accessible
 		findViewById<TextView>(R.id.password_requirement_match).setTextColor(
 			ContextCompat.getColor(this, matchColor)
