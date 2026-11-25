@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "402917490322",
+    "project_id": "cos30017-development-project",
+    "storage_bucket": "cos30017-development-project.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:402917490322:android:19ffe0dbe38e754e07704b",
+        "android_client_info": {
+          "package_name": "com.example.cos30017developmentproject"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFFOuXExF9FkwyBmxt_4eHfbfXPrgwt2A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
