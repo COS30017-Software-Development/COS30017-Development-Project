@@ -10,7 +10,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return signedIn() && request.auth.token.role == 'ADMIN';
+      return signedIn() && request.auth.token.get('role', '') == 'ADMIN';
     }
 
     function claimPath(studentId, itemId) {
@@ -21,8 +21,43 @@ service cloud.firestore {
       return /databases/$(database)/documents/items/$(itemId);
     }
 
+    function claimDocumentPath(claimId) {
+      return /databases/$(database)/documents/claims/$(claimId);
+    }
+
     function pendingClaimCount(data) {
       return data.get('pendingClaimCount', 0);
+    }
+
+    function validAdminReview(itemId) {
+      let claimId = request.resource.data.get('lastReviewedClaimId', '');
+      let claimBefore = get(claimDocumentPath(claimId)).data;
+      let claimAfter = getAfter(claimDocumentPath(claimId)).data;
+      let nextCount = pendingClaimCount(request.resource.data);
+      let currentCount = pendingClaimCount(resource.data);
+      return isAdmin()
+        && claimId is string
+        && exists(claimDocumentPath(claimId))
+        && existsAfter(claimDocumentPath(claimId))
+        && claimBefore.itemId == itemId
+        && claimBefore.status == 'PENDING'
+        && claimAfter.itemId == itemId
+        && claimAfter.status in ['APPROVED', 'REJECTED']
+        && claimAfter.diff(claimBefore).affectedKeys().hasOnly(['status'])
+        && nextCount == currentCount - 1
+        && (
+          (claimAfter.status == 'APPROVED'
+            && resource.data.status in ['OPEN', 'CLAIMED']
+            && request.resource.data.status == 'CLOSED')
+          || (claimAfter.status == 'REJECTED'
+            && (
+              (resource.data.status == 'CLOSED'
+                && request.resource.data.status == 'CLOSED')
+              || (resource.data.status in ['OPEN', 'CLAIMED']
+                && request.resource.data.status
+                  == (nextCount > 0 ? 'CLAIMED' : 'OPEN'))
+            ))
+        );
     }
 
     function validClaim(data, claimId) {
@@ -51,6 +86,7 @@ service cloud.firestore {
 
     function validClaimantUpdate(itemId) {
       let claim = getAfter(claimPath(request.auth.uid, itemId)).data;
+      let existingClaim = get(claimPath(request.auth.uid, itemId)).data;
       return signedIn()
         && request.resource.data.status == 'CLAIMED'
         && request.resource.data.type == 'FOUND'
@@ -63,6 +99,8 @@ service cloud.firestore {
         && claim.studentId == request.auth.uid
         && claim.itemId == itemId
         && claim.status == 'PENDING'
+        && (!exists(claimPath(request.auth.uid, itemId))
+          || existingClaim.status == 'REJECTED')
         && request.resource.data.pendingClaimCount is int
         && pendingClaimCount(getAfter(itemPath(itemId)).data)
           == pendingClaimCount(get(itemPath(itemId)).data) + 1;
@@ -76,7 +114,7 @@ service cloud.firestore {
         && data.keys().hasOnly([
           'itemId', 'itemName', 'description', 'category', 'location',
           'date', 'type', 'imageUrl', 'imageName', 'status', 'postedBy',
-          'pendingClaimCount'
+          'pendingClaimCount', 'lastReviewedClaimId'
         ])
         && data.itemId is string
         && data.itemName is string && data.itemName.size() > 0 && data.itemName.size() <= 100
@@ -90,6 +128,8 @@ service cloud.firestore {
         && data.status in ['OPEN', 'CLAIMED', 'CLOSED']
         && (!data.keys().hasAny(['pendingClaimCount'])
           || (data.pendingClaimCount is int && data.pendingClaimCount >= 0))
+        && (!data.keys().hasAny(['lastReviewedClaimId'])
+          || data.lastReviewedClaimId is string)
         && data.postedBy is string;
     }
 
@@ -100,6 +140,7 @@ service cloud.firestore {
         && request.resource.data.itemId == itemId
         && request.resource.data.postedBy == request.auth.uid
         && request.resource.data.pendingClaimCount == 0
+        && !request.resource.data.keys().hasAny(['lastReviewedClaimId'])
         && request.resource.data.status == 'OPEN';
       allow update: if isOwner()
         && validItem(request.resource.data)
@@ -118,29 +159,11 @@ service cloud.firestore {
           && request.resource.data.type == resource.data.type
           && request.resource.data.imageUrl == resource.data.imageUrl
           && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'pendingClaimCount'])
-          && (
-            (isAdmin()
-              && request.resource.data.pendingClaimCount is int
-              && request.resource.data.pendingClaimCount >= 0
-              && (
-                (request.resource.data.status == 'CLOSED'
-                  && request.resource.data.pendingClaimCount == 0)
-                || (
-                  request.resource.data.pendingClaimCount
-                    == pendingClaimCount(resource.data) - 1
-                  && (
-                    (request.resource.data.pendingClaimCount == 0
-                      && request.resource.data.status == 'OPEN')
-                    || (request.resource.data.pendingClaimCount > 0
-                      && request.resource.data.status == 'CLAIMED')
-                  )
-                )
-              ))
-            || validClaimantUpdate(itemId)
-          ));
+            .hasOnly(['status', 'pendingClaimCount', 'lastReviewedClaimId'])
+          && validAdminReview(itemId))
+        || validClaimantUpdate(itemId);
       allow delete: if (isOwner() || isAdmin())
-        && pendingClaimCount(resource.data) == 0;
+        && resource.data.get('pendingClaimCount', -1) == 0;
     }
 
     match /claims/{claimId} {
@@ -166,36 +189,22 @@ service cloud.firestore {
         && validClaim(request.resource.data, claimId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
         && exists(itemPath(resource.data.itemId))
-        && getAfter(itemPath(resource.data.itemId)).data.status in ['OPEN', 'CLAIMED', 'CLOSED']
+        && getAfter(itemPath(resource.data.itemId)).data.lastReviewedClaimId == claimId
+        && pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data)
+          == pendingClaimCount(get(itemPath(resource.data.itemId)).data) - 1
         && (
-          (
-            request.resource.data.status == 'APPROVED'
-            && getAfter(itemPath(resource.data.itemId)).data.status == 'CLOSED'
-            && pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data) == 0
-          )
-          || (
-            request.resource.data.status == 'REJECTED'
+          (request.resource.data.status == 'APPROVED'
+            && get(itemPath(resource.data.itemId)).data.status in ['OPEN', 'CLAIMED']
+            && getAfter(itemPath(resource.data.itemId)).data.status == 'CLOSED')
+          || (request.resource.data.status == 'REJECTED'
             && (
-              (
-                getAfter(itemPath(resource.data.itemId)).data.status == 'CLOSED'
-                && pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data) == 0
-              )
-              || (
-                pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data)
-                  == pendingClaimCount(get(itemPath(resource.data.itemId)).data) - 1
-                && (
-                  (
-                    pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data) == 0
-                    && getAfter(itemPath(resource.data.itemId)).data.status == 'OPEN'
-                  )
-                  || (
-                    pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data) > 0
-                    && getAfter(itemPath(resource.data.itemId)).data.status == 'CLAIMED'
-                  )
-                )
-              )
-            )
-          )
+              (get(itemPath(resource.data.itemId)).data.status == 'CLOSED'
+                && getAfter(itemPath(resource.data.itemId)).data.status == 'CLOSED')
+              || (get(itemPath(resource.data.itemId)).data.status in ['OPEN', 'CLAIMED']
+                && getAfter(itemPath(resource.data.itemId)).data.status
+                  == (pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data) > 0
+                    ? 'CLAIMED' : 'OPEN'))
+            ))
         )
       ) || (
         signedIn()
@@ -206,6 +215,11 @@ service cloud.firestore {
         && request.resource.data.studentId == resource.data.studentId
         && request.resource.data.itemId == resource.data.itemId
         && request.resource.data.claimId == resource.data.claimId
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'description', 'status', 'submittedAt', 'itemTitle', 'itemLocation',
+            'studentName', 'studentEmail', 'studentNumber'
+          ])
         && exists(itemPath(resource.data.itemId))
         && get(itemPath(resource.data.itemId)).data.status in ['OPEN', 'CLAIMED']
         && get(itemPath(resource.data.itemId)).data.itemName == request.resource.data.itemTitle

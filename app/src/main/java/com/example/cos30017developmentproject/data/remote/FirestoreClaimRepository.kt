@@ -143,57 +143,35 @@ class FirestoreClaimRepository(
 			if (!existingClaim.exists()) return ClaimReviewResult.NOT_FOUND
 			val itemId = existingClaim.getString(FIELD_ITEM_ID)
 				?: return ClaimReviewResult.ITEM_NOT_FOUND
-			for (refresh in 0 until MAX_PENDING_QUERY_REFRESHES) {
-				val pendingClaims = claims.whereEqualTo(FIELD_ITEM_ID, itemId)
-					.whereEqualTo(FIELD_STATUS, ClaimStatus.PENDING)
-					.get().await().documents
-				val result = firestore.runTransaction { transaction ->
-					val claim = transaction.get(claimReference)
-					if (!claim.exists()) return@runTransaction ClaimReviewResult.NOT_FOUND
-					if (!ClaimReviewPolicy.canProcess(claim.getString(FIELD_STATUS).orEmpty())) {
-						return@runTransaction ClaimReviewResult.ALREADY_PROCESSED
-					}
-					if (claim.getString(FIELD_ITEM_ID) != itemId) {
-						return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
-					}
-					val itemReference = items.document(itemId)
-					val item = transaction.get(itemReference)
-					if (!item.exists()) return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
-					if (item.getString(FIELD_STATUS) == ItemStatus.CLOSED) {
-						return@runTransaction ClaimReviewResult.ITEM_CLOSED
-					}
-					val pendingSnapshots = pendingClaims.map { transaction.get(it.reference) }
-					val pendingCount = item.getLong(FIELD_PENDING_CLAIM_COUNT) ?: 0L
-					if (pendingCount != pendingClaims.size.toLong() || pendingSnapshots.any {
-							!it.exists() || it.getString(FIELD_STATUS) != ClaimStatus.PENDING ||
-								it.getString(FIELD_ITEM_ID) != itemId
-						}
-					) {
-						return@runTransaction null
-					}
-					if (pendingSnapshots.none { it.id == claimId }) {
-						return@runTransaction ClaimReviewResult.ALREADY_PROCESSED
-					}
+			firestore.runTransaction { transaction ->
+				val claim = transaction.get(claimReference)
+				if (!claim.exists()) return@runTransaction ClaimReviewResult.NOT_FOUND
+				if (!ClaimReviewPolicy.canProcess(claim.getString(FIELD_STATUS).orEmpty())) {
+					return@runTransaction ClaimReviewResult.ALREADY_PROCESSED
+				}
+				if (claim.getString(FIELD_ITEM_ID) != itemId) {
+					return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
+				}
+				val itemReference = items.document(itemId)
+				val item = transaction.get(itemReference)
+				if (!item.exists()) return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
+				if (item.getString(FIELD_STATUS) == ItemStatus.CLOSED) {
+					return@runTransaction ClaimReviewResult.ITEM_CLOSED
+				}
+				val pendingCount = item.getLong(FIELD_PENDING_CLAIM_COUNT) ?: 0L
+				if (pendingCount <= 0L) return@runTransaction ClaimReviewResult.FAILED
 
-					pendingSnapshots.forEach { pending ->
-						transaction.update(
-							pending.reference,
-							FIELD_STATUS,
-							if (pending.id == claimId) ClaimStatus.APPROVED else ClaimStatus.REJECTED
-						)
-					}
-					transaction.update(
-						itemReference,
-						mapOf(
-							FIELD_STATUS to ClaimReviewPolicy.approvedItemStatus(),
-							FIELD_PENDING_CLAIM_COUNT to 0
-						)
+				transaction.update(claimReference, FIELD_STATUS, ClaimStatus.APPROVED)
+				transaction.update(
+					itemReference,
+					mapOf(
+						FIELD_STATUS to ClaimReviewPolicy.approvedItemStatus(),
+						FIELD_PENDING_CLAIM_COUNT to pendingCount - 1,
+						FIELD_LAST_REVIEWED_CLAIM_ID to claimId
 					)
-					ClaimReviewResult.SUCCESS
-				}.await()
-				if (result != null) return result
-			}
-			ClaimReviewResult.FAILED
+				)
+				ClaimReviewResult.SUCCESS
+			}.await()
 		} catch (exception: CancellationException) {
 			throw exception
 		} catch (_: Exception) {
@@ -209,49 +187,41 @@ class FirestoreClaimRepository(
 			if (!existingClaim.exists()) return ClaimReviewResult.NOT_FOUND
 			val itemId = existingClaim.getString(FIELD_ITEM_ID)
 				?: return ClaimReviewResult.ITEM_NOT_FOUND
-			for (refresh in 0 until MAX_PENDING_QUERY_REFRESHES) {
-				val pendingClaims = claims.whereEqualTo(FIELD_ITEM_ID, itemId)
-					.whereEqualTo(FIELD_STATUS, ClaimStatus.PENDING)
-					.get().await().documents
-				val result = firestore.runTransaction { transaction ->
-					val claim = transaction.get(claimReference)
-					if (!claim.exists()) return@runTransaction ClaimReviewResult.NOT_FOUND
-					if (!ClaimReviewPolicy.canProcess(claim.getString(FIELD_STATUS).orEmpty())) {
-						return@runTransaction ClaimReviewResult.ALREADY_PROCESSED
-					}
-					if (claim.getString(FIELD_ITEM_ID) != itemId) {
-						return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
-					}
-					val itemReference = items.document(itemId)
-					val item = transaction.get(itemReference)
-					if (!item.exists()) return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
-					val pendingSnapshots = pendingClaims.map { transaction.get(it.reference) }
-					val pendingCount = item.getLong(FIELD_PENDING_CLAIM_COUNT) ?: 0L
-					if (pendingCount != pendingClaims.size.toLong() || pendingSnapshots.any {
-							!it.exists() || it.getString(FIELD_STATUS) != ClaimStatus.PENDING ||
-								it.getString(FIELD_ITEM_ID) != itemId
-						}
-					) {
-						return@runTransaction null
-					}
-					if (pendingSnapshots.none { it.id == claimId }) {
-						return@runTransaction ClaimReviewResult.ALREADY_PROCESSED
-					}
+			firestore.runTransaction { transaction ->
+				val claim = transaction.get(claimReference)
+				if (!claim.exists()) return@runTransaction ClaimReviewResult.NOT_FOUND
+				if (!ClaimReviewPolicy.canProcess(claim.getString(FIELD_STATUS).orEmpty())) {
+					return@runTransaction ClaimReviewResult.ALREADY_PROCESSED
+				}
+				if (claim.getString(FIELD_ITEM_ID) != itemId) {
+					return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
+				}
+				val itemReference = items.document(itemId)
+				val item = transaction.get(itemReference)
+				if (!item.exists()) return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
+				val pendingCount = item.getLong(FIELD_PENDING_CLAIM_COUNT) ?: 0L
+				if (pendingCount <= 0L) return@runTransaction ClaimReviewResult.FAILED
 
-					val remainingPendingCount = pendingCount - 1
-					transaction.update(claimReference, FIELD_STATUS, ClaimStatus.REJECTED)
-					transaction.update(
-						itemReference,
-						mapOf(
-							FIELD_STATUS to if (remainingPendingCount > 0) ItemStatus.CLAIMED else ItemStatus.OPEN,
-							FIELD_PENDING_CLAIM_COUNT to remainingPendingCount
-						)
+				val remainingPendingCount = pendingCount - 1
+				val itemStatus = item.getString(FIELD_STATUS)
+				val nextItemStatus = if (itemStatus == ItemStatus.CLOSED) {
+					ItemStatus.CLOSED
+				} else if (remainingPendingCount > 0L) {
+					ItemStatus.CLAIMED
+				} else {
+					ItemStatus.OPEN
+				}
+				transaction.update(claimReference, FIELD_STATUS, ClaimStatus.REJECTED)
+				transaction.update(
+					itemReference,
+					mapOf(
+						FIELD_STATUS to nextItemStatus,
+						FIELD_PENDING_CLAIM_COUNT to remainingPendingCount,
+						FIELD_LAST_REVIEWED_CLAIM_ID to claimId
 					)
-					ClaimReviewResult.SUCCESS
-				}.await()
-				if (result != null) return result
-			}
-			ClaimReviewResult.FAILED
+				)
+				ClaimReviewResult.SUCCESS
+			}.await()
 		} catch (exception: CancellationException) {
 			throw exception
 		} catch (_: Exception) {
@@ -310,7 +280,6 @@ class FirestoreClaimRepository(
 	private fun claimDocumentId(studentUid: String, itemId: String): String = "${studentUid}_$itemId"
 
 	private companion object {
-		const val MAX_PENDING_QUERY_REFRESHES = 3
 		const val ITEMS_COLLECTION = "items"
 		const val CLAIMS_COLLECTION = "claims"
 		const val FIELD_CLAIM_ID = "claimId"
@@ -329,6 +298,7 @@ class FirestoreClaimRepository(
 		const val FIELD_ITEM_NAME = "itemName"
 		const val FIELD_ITEM_LOCATION = "location"
 		const val FIELD_PENDING_CLAIM_COUNT = "pendingClaimCount"
+		const val FIELD_LAST_REVIEWED_CLAIM_ID = "lastReviewedClaimId"
 	}
 
 }
