@@ -176,7 +176,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 		val session = SessionManager(this)
 		val userId = session.userId
 		if (type != TYPE_FOUND || item.status == ItemStatus.CLOSED ||
-			item.postedByUserId == userId ||
+			(item.postedByUserId != null && item.postedByUserId == userId) ||
 			(item.postedByUid != null && item.postedByUid == firestoreRepository.currentUserUid)
 		) {
 			claimButton.isVisible = false
