@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
 import com.example.cos30017developmentproject.ui.items.ItemValidation
 import com.example.cos30017developmentproject.ui.items.ItemValidationError
 import com.google.android.material.button.MaterialButton
@@ -20,16 +21,17 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class EditItemActivity : AppCompatActivity() {
-	private lateinit var repository: LostAndFoundRepository
-	private var itemId = INVALID_ITEM_ID
+	private lateinit var repository: FirestoreItemRepository
+	private lateinit var localRepository: LostAndFoundRepository
+	private var itemId = ""
 	private var itemType = ""
 	private var isSaving = false
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
-		itemId = intent.getLongExtra(ItemDetailsActivity.EXTRA_ITEM_ID, INVALID_ITEM_ID)
+		itemId = intent.getStringExtra(ItemDetailsActivity.EXTRA_ITEM_ID).orEmpty()
 		itemType = intent.getStringExtra(ItemDetailsActivity.EXTRA_ITEM_TYPE).orEmpty()
-		if (itemId == INVALID_ITEM_ID || itemType !in setOf(ItemDetailsActivity.TYPE_LOST, ItemDetailsActivity.TYPE_FOUND)) {
+		if (itemId.isBlank() || itemType !in setOf(ItemDetailsActivity.TYPE_LOST, ItemDetailsActivity.TYPE_FOUND)) {
 			finish()
 			return
 		}
@@ -41,7 +43,8 @@ class EditItemActivity : AppCompatActivity() {
 			view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, keyboard.bottom))
 			WindowInsetsCompat.CONSUMED
 		}
-		repository = LostAndFoundRepository(AppDatabase.getInstance(this))
+		repository = FirestoreItemRepository()
+		localRepository = LostAndFoundRepository(AppDatabase.getInstance(this))
 		findViewById<View>(R.id.edit_item_cancel).setOnClickListener { finish() }
 		findViewById<View>(R.id.edit_item_save).setOnClickListener { saveItem() }
 		loadItem()
@@ -50,24 +53,36 @@ class EditItemActivity : AppCompatActivity() {
 	private fun loadItem() {
 		lifecycleScope.launch {
 			try {
-				val userId = SessionManager(this@EditItemActivity).userId
-				val item = when (itemType) {
-					ItemDetailsActivity.TYPE_LOST -> repository.getLostItem(itemId)?.takeIf { it.postedByUserId == userId }?.let {
-						EditableItem(it.title, it.description, it.location, it.category, it.imageName)
+				val currentUid = repository.currentUserUid
+				val cloudItem = repository.getItem(itemId)
+				val item = cloudItem?.takeIf { it.postedBy == currentUid }?.let {
+					EditableItem(it.itemName, it.description, it.location, it.category, it.imageName)
+				} ?: if (cloudItem == null) {
+					val localId = itemId.toLongOrNull()
+					val userId = SessionManager(this@EditItemActivity).userId
+					when (itemType) {
+						ItemDetailsActivity.TYPE_LOST -> localId?.let { id ->
+							localRepository.getLostItem(id)?.takeIf { it.postedByUserId == userId }?.let {
+								EditableItem(it.title, it.description, it.location, it.category, it.imageName)
+							}
+						}
+						ItemDetailsActivity.TYPE_FOUND -> localId?.let { id ->
+							localRepository.getFoundItem(id)?.takeIf { it.postedByUserId == userId }?.let {
+								EditableItem(it.title, it.description, it.location, it.category, it.imageName)
+							}
+						}
+						else -> null
 					}
-					ItemDetailsActivity.TYPE_FOUND -> repository.getFoundItem(itemId)?.takeIf { it.postedByUserId == userId }?.let {
-						EditableItem(it.title, it.description, it.location, it.category, it.imageName)
-					}
-					else -> null
-				} ?: run {
+				} else null
+				val editableItem = item ?: run {
 					showPermissionDeniedAndFinish()
 					return@launch
 				}
-				findViewById<EditText>(R.id.edit_item_name).setText(item.title)
-				findViewById<EditText>(R.id.edit_item_category).setText(item.category)
-				findViewById<EditText>(R.id.edit_item_location).setText(item.location)
-				findViewById<EditText>(R.id.edit_item_description).setText(item.description)
-				findViewById<EditText>(R.id.edit_item_image_name).setText(item.imageName)
+				findViewById<EditText>(R.id.edit_item_name).setText(editableItem.title)
+				findViewById<EditText>(R.id.edit_item_category).setText(editableItem.category)
+				findViewById<EditText>(R.id.edit_item_location).setText(editableItem.location)
+				findViewById<EditText>(R.id.edit_item_description).setText(editableItem.description)
+				findViewById<EditText>(R.id.edit_item_image_name).setText(editableItem.imageName)
 			} catch (e: CancellationException) {
 				throw e
 			} catch (e: Exception) {
@@ -94,25 +109,51 @@ class EditItemActivity : AppCompatActivity() {
 		findViewById<MaterialButton>(R.id.edit_item_save).isEnabled = false
 		lifecycleScope.launch {
 			try {
-				val userId = SessionManager(this@EditItemActivity).userId
+				val currentUid = repository.currentUserUid
 					?: run {
 						showPermissionDeniedAndFinish()
 						return@launch
 					}
-				val updated = when (itemType) {
-					ItemDetailsActivity.TYPE_LOST -> repository.updateLostItemOwned(
-						itemId, userId, title, description, location, category, imageName
-					)
-					ItemDetailsActivity.TYPE_FOUND -> repository.updateFoundItemOwned(
-						itemId, userId, title, description, location, category, imageName
-					)
-					else -> false
+				val item = repository.getItem(itemId)
+				val expectedType = if (itemType == ItemDetailsActivity.TYPE_FOUND) {
+					FirestoreItemRepository.TYPE_FOUND
+				} else {
+					FirestoreItemRepository.TYPE_LOST
 				}
-				if (updated) {
-					Toast.makeText(this@EditItemActivity, R.string.item_updated, Toast.LENGTH_SHORT).show()
-					setResult(RESULT_OK)
-					finish()
-				} else showPermissionDeniedAndFinish()
+				if (item != null && (item.postedBy != currentUid || item.type != expectedType)) {
+					showPermissionDeniedAndFinish()
+					return@launch
+				}
+				if (item != null) {
+					repository.updateItem(itemId, title, description, category, location, imageName)
+				} else {
+					val localId = itemId.toLongOrNull()
+						?: run {
+							showPermissionDeniedAndFinish()
+							return@launch
+						}
+					val userId = SessionManager(this@EditItemActivity).userId
+						?: run {
+							showPermissionDeniedAndFinish()
+							return@launch
+						}
+					val updated = when (itemType) {
+						ItemDetailsActivity.TYPE_LOST -> localRepository.updateLostItemOwned(
+							localId, userId, title, description, location, category, imageName
+						)
+						ItemDetailsActivity.TYPE_FOUND -> localRepository.updateFoundItemOwned(
+							localId, userId, title, description, location, category, imageName
+						)
+						else -> false
+					}
+					if (!updated) {
+						showPermissionDeniedAndFinish()
+						return@launch
+					}
+				}
+				Toast.makeText(this@EditItemActivity, R.string.item_updated, Toast.LENGTH_SHORT).show()
+				setResult(RESULT_OK)
+				finish()
 			} catch (e: CancellationException) {
 				throw e
 			} catch (e: Exception) {
@@ -155,7 +196,6 @@ class EditItemActivity : AppCompatActivity() {
 	)
 
 	private companion object {
-		const val INVALID_ITEM_ID = -1L
 		const val TAG = "EditItemActivity"
 	}
 }

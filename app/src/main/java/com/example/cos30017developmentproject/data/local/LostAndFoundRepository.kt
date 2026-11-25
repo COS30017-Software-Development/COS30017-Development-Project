@@ -13,6 +13,7 @@ class LostAndFoundRepository(database: AppDatabase) {
 
 	fun observeUsers(): Flow<List<UserEntity>> = users.observeAll()
 	suspend fun getUser(id: Long): UserEntity? = users.getById(id)
+	suspend fun getUserByFirebaseUid(firebaseUid: String): UserEntity? = users.getByFirebaseUid(firebaseUid)
 	suspend fun addUser(user: UserEntity): Long = users.insert(user)
 	suspend fun updateUser(user: UserEntity) = users.update(user)
 	suspend fun deleteUser(user: UserEntity) = users.delete(user)

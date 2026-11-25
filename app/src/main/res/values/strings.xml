@@ -17,7 +17,8 @@ Bring it home.</string >
 	<string name = "home_description" >A little help goes a long way. Find lost belongings and reconnect them with their owners.</string >
 	<string name = "search_hint" >Search lost and found items</string >
 	<string name = "recent_items" >Around campus</string >
-	<string name = "sample_notice" >Sample items · Style preview</string >
+	<string name = "sample_notice" >Live updates · Latest campus posts</string >
+	<string name="no_items_posted_yet">No items have been posted yet.</string>
 	<string name = "drawer_title" >Campus Lost &amp; Found</string >
 	<string name = "drawer_subtitle" >STUDENT SPACE</string >
 	<string name = "preview_message" >%1$s will be available in a later update.</string >
@@ -136,6 +137,7 @@ Bring it home.</string >
 	<string name="item_description_too_long">Description is too long.</string>
 	<string name="item_image_name_invalid">Use a lowercase drawable name such as sample_backpack.</string>
 	<string name="item_save_failed">Unable to save this item. Please try again.</string>
+	<string name="items_load_failed">Unable to load items. Check your connection and try again.</string>
 	<string name="add_item_title">Post an item</string>
 	<string name="post_item">Post item</string>
 	<string name="item_posted">Item posted.</string>

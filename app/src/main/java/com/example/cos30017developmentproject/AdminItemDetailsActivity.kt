@@ -2,6 +2,7 @@ package com.example.cos30017developmentproject
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
@@ -14,21 +15,25 @@ import androidx.lifecycle.lifecycleScope
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class AdminItemDetailsActivity : AppCompatActivity() {
 	private lateinit var repository: LostAndFoundRepository
+	private lateinit var firestoreRepository: FirestoreItemRepository
 	private lateinit var sessionManager: SessionManager
-	private var itemId = INVALID_ITEM_ID
+	private var itemId = ""
 	private var itemType = ""
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
 		sessionManager = SessionManager(this)
 		repository = LostAndFoundRepository(AppDatabase.getInstance(this))
-		itemId = intent.getLongExtra(EXTRA_ITEM_ID, INVALID_ITEM_ID)
+		firestoreRepository = FirestoreItemRepository()
+		itemId = intent.getStringExtra(EXTRA_ITEM_ID).orEmpty()
 		itemType = intent.getStringExtra(EXTRA_ITEM_TYPE).orEmpty()
 		enableEdgeToEdge()
 		setContentView(R.layout.activity_admin_item_details)
@@ -44,7 +49,7 @@ class AdminItemDetailsActivity : AppCompatActivity() {
 
 	private fun verifyAdminAndLoad() {
 		val adminId = sessionManager.userId
-		if (itemId == INVALID_ITEM_ID || itemType !in setOf(ItemDetailsActivity.TYPE_LOST, ItemDetailsActivity.TYPE_FOUND) ||
+		if (itemId.isBlank() || itemType !in setOf(ItemDetailsActivity.TYPE_LOST, ItemDetailsActivity.TYPE_FOUND) ||
 			adminId == null
 		) {
 			denyAccess()
@@ -61,34 +66,48 @@ class AdminItemDetailsActivity : AppCompatActivity() {
 
 	private fun loadItem() {
 		lifecycleScope.launch {
-			val details = when (itemType) {
-				ItemDetailsActivity.TYPE_LOST -> repository.getLostItem(itemId)?.let { item ->
-					val poster = repository.getUser(item.postedByUserId)
-					AdminItemDetails(item.id, item.title, item.description, item.location, item.category, item.imageName, poster)
+			try {
+				val cloudItem = firestoreRepository.getItem(itemId)
+					?.takeIf {
+						it.type == if (itemType == ItemDetailsActivity.TYPE_FOUND) {
+							FirestoreItemRepository.TYPE_FOUND
+						} else {
+							FirestoreItemRepository.TYPE_LOST
+						}
+					}
+				if (cloudItem == null) {
+					Toast.makeText(this@AdminItemDetailsActivity, R.string.item_not_found, Toast.LENGTH_SHORT).show()
+					finish()
+					return@launch
 				}
-				ItemDetailsActivity.TYPE_FOUND -> repository.getFoundItem(itemId)?.let { item ->
-					val poster = repository.getUser(item.postedByUserId)
-					AdminItemDetails(item.id, item.title, item.description, item.location, item.category, item.imageName, poster)
-				}
-				else -> null
-			}
-			if (details == null) {
-				Toast.makeText(this@AdminItemDetailsActivity, R.string.item_not_found, Toast.LENGTH_SHORT).show()
+				val poster = repository.getUserByFirebaseUid(cloudItem.postedBy)
+				val details = AdminItemDetails(
+					cloudItem.itemName,
+					cloudItem.description,
+					cloudItem.location,
+					cloudItem.category,
+					cloudItem.imageName,
+					poster
+				)
+				val imageId = resources.getIdentifier(details.imageName, "drawable", packageName)
+				findViewById<ImageView>(R.id.admin_item_image).setImageResource(
+					if (imageId != 0) imageId else R.drawable.sample_backpack
+				)
+				findViewById<TextView>(R.id.admin_item_name).text = details.title
+				findViewById<TextView>(R.id.admin_item_type).text = itemType
+				findViewById<TextView>(R.id.admin_item_category).text = details.category
+				findViewById<TextView>(R.id.admin_item_location).text = details.location
+				findViewById<TextView>(R.id.admin_item_description).text = details.description
+				findViewById<TextView>(R.id.admin_item_poster).text = details.poster?.username ?: cloudItem.postedBy
+				findViewById<TextView>(R.id.admin_item_poster_email).text = details.poster?.email.orEmpty()
+				findViewById<TextView>(R.id.admin_item_poster_student_id).text = details.poster?.studentId.orEmpty()
+			} catch (exception: CancellationException) {
+				throw exception
+			} catch (exception: Exception) {
+				Log.e(TAG, "Unable to load administrator item", exception)
+				Toast.makeText(this@AdminItemDetailsActivity, R.string.items_load_failed, Toast.LENGTH_SHORT).show()
 				finish()
-				return@launch
 			}
-			val imageId = resources.getIdentifier(details.imageName, "drawable", packageName)
-			findViewById<ImageView>(R.id.admin_item_image).setImageResource(
-				if (imageId != 0) imageId else R.drawable.sample_backpack
-			)
-			findViewById<TextView>(R.id.admin_item_name).text = details.title
-			findViewById<TextView>(R.id.admin_item_type).text = itemType
-			findViewById<TextView>(R.id.admin_item_category).text = details.category
-			findViewById<TextView>(R.id.admin_item_location).text = details.location
-			findViewById<TextView>(R.id.admin_item_description).text = details.description
-			findViewById<TextView>(R.id.admin_item_poster).text = details.poster?.username.orEmpty()
-			findViewById<TextView>(R.id.admin_item_poster_email).text = details.poster?.email.orEmpty()
-			findViewById<TextView>(R.id.admin_item_poster_student_id).text = details.poster?.studentId.orEmpty()
 		}
 	}
 
@@ -104,20 +123,19 @@ class AdminItemDetailsActivity : AppCompatActivity() {
 	private fun deleteItem() {
 		val adminId = sessionManager.userId ?: return denyAccess()
 		lifecycleScope.launch {
-			val deleted = when (itemType) {
-				ItemDetailsActivity.TYPE_LOST -> repository.deleteLostItemAsAdmin(itemId, adminId)
-				ItemDetailsActivity.TYPE_FOUND -> repository.deleteFoundItemAsAdmin(itemId, adminId)
-				else -> false
-			}
-			if (deleted) {
+			try {
+				if (!repository.isAdmin(adminId)) {
+					denyAccess()
+					return@launch
+				}
+				firestoreRepository.deleteItem(itemId)
 				Toast.makeText(this@AdminItemDetailsActivity, R.string.item_deleted, Toast.LENGTH_SHORT).show()
 				finish()
-			} else {
-				Toast.makeText(
-					this@AdminItemDetailsActivity,
-					R.string.admin_delete_failed,
-					Toast.LENGTH_SHORT
-				).show()
+			} catch (exception: CancellationException) {
+				throw exception
+			} catch (exception: Exception) {
+				Log.e(TAG, "Unable to delete administrator item", exception)
+				Toast.makeText(this@AdminItemDetailsActivity, R.string.admin_delete_failed, Toast.LENGTH_SHORT).show()
 			}
 		}
 	}
@@ -130,7 +148,6 @@ class AdminItemDetailsActivity : AppCompatActivity() {
 	}
 
 	private data class AdminItemDetails(
-		val id: Long,
 		val title: String,
 		val description: String,
 		val location: String,
@@ -142,6 +159,6 @@ class AdminItemDetailsActivity : AppCompatActivity() {
 	companion object {
 		const val EXTRA_ITEM_ID = "admin_item_id"
 		const val EXTRA_ITEM_TYPE = "admin_item_type"
-		private const val INVALID_ITEM_ID = -1L
+		private const val TAG = "AdminItemDetailsActivity"
 	}
 }

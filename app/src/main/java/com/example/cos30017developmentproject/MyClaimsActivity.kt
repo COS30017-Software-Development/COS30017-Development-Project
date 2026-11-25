@@ -44,7 +44,7 @@ class MyClaimsActivity : AppCompatActivity() {
 		findViewById<MaterialToolbar>(R.id.my_claims_toolbar).setNavigationOnClickListener { finish() }
 		val adapter = ClaimCardAdapter { card ->
 			startActivity(Intent(this, ItemDetailsActivity::class.java).apply {
-				putExtra(ItemDetailsActivity.EXTRA_ITEM_ID, card.foundItemId)
+				putExtra(ItemDetailsActivity.EXTRA_ITEM_ID, card.foundItemId.toString())
 				putExtra(ItemDetailsActivity.EXTRA_ITEM_TYPE, ItemDetailsActivity.TYPE_FOUND)
 			})
 		}

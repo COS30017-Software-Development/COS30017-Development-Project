@@ -5,9 +5,11 @@ import android.os.Bundle
 import android.view.View
 import android.view.Window
 import android.view.inputmethod.EditorInfo
+import android.util.Log
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
@@ -18,12 +20,12 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.example.cos30017developmentproject.R
 import com.example.cos30017developmentproject.ItemDetailsActivity
-import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
 import com.example.cos30017developmentproject.ui.home.ItemCardAdapter
 import com.example.cos30017developmentproject.ui.home.ItemCard
 import com.example.cos30017developmentproject.ui.home.toItemCard
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -33,7 +35,7 @@ class ItemsPage(
 	private val view: View,
 	window: Window,
 	savedState: Bundle?,
-	private val repository: LostAndFoundRepository,
+	private val repository: FirestoreItemRepository,
 	private val lifecycleOwner: LifecycleOwner
 ) {
 	private val insetsController = WindowCompat.getInsetsController(window, view)
@@ -104,28 +106,30 @@ class ItemsPage(
 		itemsJob?.cancel()
 		val context = view.context
 		itemsJob = lifecycleOwner.lifecycleScope.launch {
-			when (filter) {
-				ItemFilter.ALL -> combine(
-					repository.observeLostItems(),
-					repository.observeFoundItems()
-				) { lost, found ->
-					lost.map { it.toItemCard(context) } + found.map { it.toItemCard(context) }
+			repository.observeItems()
+				.catch { error ->
+					Log.e(TAG, "Unable to load items page", error)
+					Toast.makeText(context, R.string.items_load_failed, Toast.LENGTH_SHORT).show()
+					emit(emptyList())
 				}
-				ItemFilter.LOST -> repository.observeLostItems().map { items ->
-					items.map { it.toItemCard(context) }
+				.map { items ->
+					items.filter { item ->
+						when (filter) {
+							ItemFilter.ALL -> true
+							ItemFilter.LOST -> item.type == FirestoreItemRepository.TYPE_LOST
+							ItemFilter.FOUND -> item.type == FirestoreItemRepository.TYPE_FOUND
+						}
+					}.map { it.toItemCard(context) }
 				}
-				ItemFilter.FOUND -> repository.observeFoundItems().map { items ->
-					items.map { it.toItemCard(context) }
+				.collect { items ->
+					pagination = ItemPagination(items) { "${it.title}\n${it.description}" }
+					pagination.search(search.text.toString())
+					pendingPageIndex?.let {
+						pagination.goToPage(it)
+						pendingPageIndex = null
+					}
+					render()
 				}
-			}.collect { items ->
-				pagination = ItemPagination(items) { "${it.title}\n${it.description}" }
-				pagination.search(search.text.toString())
-				pendingPageIndex?.let {
-					pagination.goToPage(it)
-					pendingPageIndex = null
-				}
-				render()
-			}
 		}
 	}
 
@@ -156,5 +160,9 @@ class ItemsPage(
 		previous.isEnabled = pagination.pageIndex > 0
 		next.isEnabled = pagination.pageIndex < pagination.pageCount - 1
 		listOf(previous, next).forEach { it.alpha = if (it.isEnabled) 1f else 0.35f }
+	}
+
+	private companion object {
+		const val TAG = "ItemsPage"
 	}
 }

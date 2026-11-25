@@ -2,6 +2,7 @@ package com.example.cos30017developmentproject
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
@@ -16,15 +17,17 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
 import com.example.cos30017developmentproject.ui.home.ItemCard
 import com.example.cos30017developmentproject.ui.home.ItemCardAdapter
 import com.example.cos30017developmentproject.ui.home.toItemCard
 import com.google.android.material.appbar.MaterialToolbar
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 class AdminDashboardActivity : AppCompatActivity() {
 	private lateinit var repository: LostAndFoundRepository
+	private lateinit var firestoreRepository: FirestoreItemRepository
 	private lateinit var sessionManager: SessionManager
 	private lateinit var adapter: ItemCardAdapter
 	private var allCards: List<ItemCard> = emptyList()
@@ -34,6 +37,7 @@ class AdminDashboardActivity : AppCompatActivity() {
 		super.onCreate(savedInstanceState)
 		sessionManager = SessionManager(this)
 		repository = LostAndFoundRepository(AppDatabase.getInstance(this))
+		firestoreRepository = FirestoreItemRepository()
 		enableEdgeToEdge()
 		setContentView(R.layout.activity_admin_dashboard)
 		ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.admin_dashboard_root)) { view, insets ->
@@ -78,13 +82,17 @@ class AdminDashboardActivity : AppCompatActivity() {
 				denyAccess()
 				return@launch
 			}
-			combine(repository.observeLostItems(), repository.observeFoundItems()) { lost, found ->
-				lost.map { it.toItemCard(this@AdminDashboardActivity) } +
-					found.map { it.toItemCard(this@AdminDashboardActivity) }
-			}.collect { cards ->
-				allCards = cards
-				applyFilter()
-			}
+			firestoreRepository.observeItems()
+				.catch { error ->
+					Log.e(TAG, "Unable to load administrator items", error)
+					Toast.makeText(this@AdminDashboardActivity, R.string.items_load_failed, Toast.LENGTH_SHORT).show()
+					emit(emptyList())
+				}
+				.collect { items ->
+					val cards = items.map { it.toItemCard(this@AdminDashboardActivity) }
+					allCards = cards
+					applyFilter()
+				}
 		}
 	}
 
@@ -122,4 +130,8 @@ class AdminDashboardActivity : AppCompatActivity() {
 	}
 
 	private enum class AdminFilter { ALL, LOST, FOUND }
+
+	private companion object {
+		const val TAG = "AdminDashboardActivity"
+	}
 }

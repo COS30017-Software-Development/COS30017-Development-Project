@@ -19,6 +19,7 @@ import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.ClaimSubmissionResult
 import com.example.cos30017developmentproject.data.local.ItemStatus
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -27,9 +28,10 @@ import kotlinx.coroutines.launch
 
 class ItemDetailsActivity : AppCompatActivity() {
 	private lateinit var repository: LostAndFoundRepository
+	private lateinit var firestoreRepository: FirestoreItemRepository
 	private val editItem = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
 		if (result.resultCode == RESULT_OK) {
-			loadItem(intent.getLongExtra(EXTRA_ITEM_ID, INVALID_ITEM_ID), intent.getStringExtra(EXTRA_ITEM_TYPE).orEmpty())
+			itemIdFromIntent(intent)?.let { loadItem(it, intent.getStringExtra(EXTRA_ITEM_TYPE).orEmpty()) }
 		}
 	}
 
@@ -47,32 +49,84 @@ class ItemDetailsActivity : AppCompatActivity() {
 			.setNavigationOnClickListener { finish() }
 		findViewById<View>(R.id.back_to_items).setOnClickListener { finish() }
 		repository = LostAndFoundRepository(AppDatabase.getInstance(this))
+		firestoreRepository = FirestoreItemRepository()
 
-		val id = intent.getLongExtra(EXTRA_ITEM_ID, INVALID_ITEM_ID)
+		val id = itemIdFromIntent(intent)
 		val type = intent.getStringExtra(EXTRA_ITEM_TYPE) ?: ""
-		if (id == INVALID_ITEM_ID || type !in setOf(TYPE_LOST, TYPE_FOUND)) {
+		if (id.isNullOrBlank() || type !in setOf(TYPE_LOST, TYPE_FOUND)) {
 			showItemNotFound()
 			return
 		}
 		loadItem(id, type)
 	}
 
-	private fun loadItem(id: Long, type: String) {
+	private fun loadItem(id: String, type: String) {
 		lifecycleScope.launch {
 			try {
-				val item = when (type) {
-					TYPE_LOST -> repository.getLostItem(id)?.let {
-						ItemDetails(it.id, it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId)
+				val cloudItem = firestoreRepository.getItem(id)
+				val expectedType = if (type == TYPE_FOUND) {
+					FirestoreItemRepository.TYPE_FOUND
+				} else {
+					FirestoreItemRepository.TYPE_LOST
+				}
+				val item = if (cloudItem != null) {
+					cloudItem.takeIf { it.type == expectedType }?.let {
+						ItemDetails(
+							id = it.itemId,
+							title = it.itemName,
+							description = it.description,
+							location = it.location,
+							category = it.category,
+							imageName = it.imageName,
+							postedByUid = it.postedBy,
+							status = it.status
+						)
 					}
-					TYPE_FOUND -> repository.getFoundItem(id)?.let {
-						ItemDetails(it.id, it.title, it.description, it.location, it.category, it.imageName, it.postedByUserId, it.status)
+				} else {
+					val localId = id.toLongOrNull()
+					when (type) {
+						TYPE_LOST -> localId?.let { roomId ->
+							repository.getLostItem(roomId)?.let { lost ->
+								val poster = repository.getUser(lost.postedByUserId)
+								ItemDetails(
+									id = id,
+									title = lost.title,
+									description = lost.description,
+									location = lost.location,
+									category = lost.category,
+									imageName = lost.imageName,
+									postedByUid = poster?.firebaseUid,
+									postedByUserId = lost.postedByUserId,
+									roomItemId = roomId
+								)
+							}
+						}
+						TYPE_FOUND -> localId?.let { roomId ->
+							repository.getFoundItem(roomId)?.let { found ->
+								val poster = repository.getUser(found.postedByUserId)
+								ItemDetails(
+									id = id,
+									title = found.title,
+									description = found.description,
+									location = found.location,
+									category = found.category,
+									imageName = found.imageName,
+									postedByUid = poster?.firebaseUid,
+									postedByUserId = found.postedByUserId,
+									status = found.status,
+									roomItemId = roomId
+								)
+							}
+						}
+						else -> null
 					}
-					else -> null
 				} ?: run {
 					showItemNotFound()
 					return@launch
 				}
-				bindItem(item, type, repository.getUser(item.postedByUserId)?.username)
+				val username = item.postedByUserId?.let { repository.getUser(it)?.username }
+					?: item.postedByUid?.let { repository.getUserByFirebaseUid(it)?.username }
+				bindItem(item, type, username ?: item.postedByUid)
 			} catch (e: CancellationException) {
 				throw e
 			} catch (e: Exception) {
@@ -106,8 +160,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 		findViewById<TextView>(R.id.item_details_description).text = item.description
 		findViewById<View>(R.id.item_details_poster_section).isVisible = username != null
 		findViewById<TextView>(R.id.item_details_poster).text = username.orEmpty()
-		findViewById<View>(R.id.item_owner_actions).isVisible =
-			SessionManager(this).userId == item.postedByUserId
+		findViewById<View>(R.id.item_owner_actions).isVisible = isCurrentUserOwner(item)
 		findViewById<View>(R.id.edit_item).setOnClickListener { openEdit(item.id, type) }
 		findViewById<View>(R.id.delete_item).setOnClickListener { confirmDelete(item.id, type) }
 		findViewById<View>(R.id.claim_item).setOnClickListener { openClaimDialog(item) }
@@ -118,7 +171,11 @@ class ItemDetailsActivity : AppCompatActivity() {
 		val claimButton = findViewById<View>(R.id.claim_item)
 		val session = SessionManager(this)
 		val userId = session.userId
-		if (type != TYPE_FOUND || item.status == ItemStatus.CLOSED || item.postedByUserId == userId) {
+		val roomItemId = item.roomItemId
+		if (type != TYPE_FOUND || roomItemId == null || item.status == ItemStatus.CLOSED ||
+			item.postedByUserId == userId ||
+			(item.postedByUid != null && item.postedByUid == firestoreRepository.currentUserUid)
+		) {
 			claimButton.isVisible = false
 			return
 		}
@@ -130,13 +187,14 @@ class ItemDetailsActivity : AppCompatActivity() {
 			return
 		}
 		lifecycleScope.launch {
-			val alreadyClaimed = repository.hasClaim(userId, item.id)
+			val alreadyClaimed = repository.hasClaim(userId, roomItemId)
 			claimButton.isVisible = !alreadyClaimed
 			claimButton.isEnabled = !alreadyClaimed
 		}
 	}
 
 	private fun openClaimDialog(item: ItemDetails) {
+		val roomItemId = item.roomItemId ?: return
 		val userId = SessionManager(this).userId
 		if (userId == null) {
 			startActivity(Intent(this, AuthActivity::class.java))
@@ -159,7 +217,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 					description.length > 500 -> inputLayout.error = getString(R.string.claim_description_too_long)
 					else -> {
 						inputLayout.error = null
-						submitClaim(dialog, item.id, userId, description)
+						submitClaim(dialog, roomItemId, userId, description)
 					}
 				}
 			}
@@ -196,7 +254,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 		}
 	}
 
-	private fun openEdit(id: Long, type: String) {
+	private fun openEdit(id: String, type: String) {
 		lifecycleScope.launch {
 			if (!isCurrentUserOwner(id, type)) {
 				showPermissionDenied()
@@ -209,7 +267,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 		}
 	}
 
-	private fun confirmDelete(id: Long, type: String) {
+	private fun confirmDelete(id: String, type: String) {
 		lifecycleScope.launch {
 			try {
 				if (!isCurrentUserOwner(id, type)) {
@@ -231,7 +289,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 		}
 	}
 
-	private fun deleteItem(id: Long, type: String) {
+	private fun deleteItem(id: String, type: String) {
 		lifecycleScope.launch {
 			try {
 				val userId = SessionManager(this@ItemDetailsActivity).userId
@@ -239,15 +297,31 @@ class ItemDetailsActivity : AppCompatActivity() {
 						showPermissionDenied()
 						return@launch
 					}
-				val deleted = when (type) {
-					TYPE_LOST -> repository.deleteLostItemOwned(id, userId)
-					TYPE_FOUND -> repository.deleteFoundItemOwned(id, userId)
-					else -> false
+				val cloudItem = firestoreRepository.getItem(id)
+				if (cloudItem != null) {
+					if (cloudItem.postedBy != firestoreRepository.currentUserUid) {
+						showPermissionDenied()
+						return@launch
+					}
+					firestoreRepository.deleteItem(id)
+				} else {
+					val roomId = id.toLongOrNull()
+						?: run {
+							showPermissionDenied()
+							return@launch
+						}
+					val deleted = when (type) {
+						TYPE_LOST -> repository.deleteLostItemOwned(roomId, userId)
+						TYPE_FOUND -> repository.deleteFoundItemOwned(roomId, userId)
+						else -> false
+					}
+					if (!deleted) {
+						showPermissionDenied()
+						return@launch
+					}
 				}
-				if (deleted) {
-					Toast.makeText(this@ItemDetailsActivity, R.string.item_deleted, Toast.LENGTH_SHORT).show()
-					finish()
-				} else showPermissionDenied()
+				Toast.makeText(this@ItemDetailsActivity, R.string.item_deleted, Toast.LENGTH_SHORT).show()
+				finish()
 			} catch (e: CancellationException) {
 				throw e
 			} catch (e: Exception) {
@@ -257,14 +331,21 @@ class ItemDetailsActivity : AppCompatActivity() {
 		}
 	}
 
-	private suspend fun isCurrentUserOwner(id: Long, type: String): Boolean {
+	private suspend fun isCurrentUserOwner(id: String, type: String): Boolean {
+		val cloudItem = firestoreRepository.getItem(id)
+		if (cloudItem != null) return cloudItem.postedBy == firestoreRepository.currentUserUid
 		val userId = SessionManager(this).userId ?: return false
+		val roomId = id.toLongOrNull() ?: return false
 		return when (type) {
-			TYPE_LOST -> repository.getLostItem(id)?.postedByUserId == userId
-			TYPE_FOUND -> repository.getFoundItem(id)?.postedByUserId == userId
+			TYPE_LOST -> repository.getLostItem(roomId)?.postedByUserId == userId
+			TYPE_FOUND -> repository.getFoundItem(roomId)?.postedByUserId == userId
 			else -> false
 		}
 	}
+
+	private fun isCurrentUserOwner(item: ItemDetails): Boolean =
+		(item.postedByUid != null && item.postedByUid == firestoreRepository.currentUserUid) ||
+			(item.postedByUserId != null && item.postedByUserId == SessionManager(this).userId)
 
 	private fun showPermissionDenied() {
 		Toast.makeText(this, R.string.item_action_not_allowed, Toast.LENGTH_SHORT).show()
@@ -276,22 +357,25 @@ class ItemDetailsActivity : AppCompatActivity() {
 	}
 
 	private data class ItemDetails(
-		val id: Long,
+		val id: String,
 		val title: String,
 		val description: String,
 		val location: String,
 		val category: String,
 		val imageName: String,
-		val postedByUserId: Long,
-		val status: String = ItemStatus.OPEN
+		val postedByUid: String?,
+		val postedByUserId: Long? = null,
+		val status: String = ItemStatus.OPEN,
+		val roomItemId: Long? = null
 	)
+
+	private fun itemIdFromIntent(intent: Intent): String? = intent.getStringExtra(EXTRA_ITEM_ID)
 
 	companion object {
 		const val EXTRA_ITEM_ID = "item_id"
 		const val EXTRA_ITEM_TYPE = "item_type"
 		const val TYPE_LOST = "Lost"
 		const val TYPE_FOUND = "Found"
-		private const val INVALID_ITEM_ID = -1L
 		private const val TAG = "ItemDetailsActivity"
 	}
 }

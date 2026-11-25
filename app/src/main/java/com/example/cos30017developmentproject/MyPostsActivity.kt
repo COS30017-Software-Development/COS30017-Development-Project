@@ -2,8 +2,10 @@ package com.example.cos30017developmentproject
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -14,18 +16,17 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.auth.SessionManager
-import com.example.cos30017developmentproject.data.local.AppDatabase
-import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
 import com.example.cos30017developmentproject.ui.home.ItemCard
 import com.example.cos30017developmentproject.ui.home.ItemCardAdapter
 import com.example.cos30017developmentproject.ui.home.toItemCard
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 class MyPostsActivity : AppCompatActivity() {
-	private lateinit var repository: LostAndFoundRepository
+	private lateinit var repository: FirestoreItemRepository
 	private lateinit var sessionManager: SessionManager
 	private lateinit var adapter: ItemCardAdapter
 	private var filter = PostFilter.ALL
@@ -47,7 +48,7 @@ class MyPostsActivity : AppCompatActivity() {
 			view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, keyboard.bottom))
 			WindowInsetsCompat.CONSUMED
 		}
-		repository = LostAndFoundRepository(AppDatabase.getInstance(this))
+		repository = FirestoreItemRepository()
 		findViewById<MaterialToolbar>(R.id.my_posts_toolbar).setNavigationOnClickListener { finish() }
 		adapter = ItemCardAdapter(onItemClick = ::openItemDetails)
 		adapter.setListMode(true)
@@ -63,15 +64,19 @@ class MyPostsActivity : AppCompatActivity() {
 	}
 
 	private fun observePosts() {
-		val userId = sessionManager.userId ?: return
+		val uid = repository.currentUserUid ?: return
 		lifecycleScope.launch {
-			combine(repository.observeLostItems(), repository.observeFoundItems()) { lost, found ->
-				(lost.filter { it.postedByUserId == userId }.map { it.toItemCard(this@MyPostsActivity) } +
-					found.filter { it.postedByUserId == userId }.map { it.toItemCard(this@MyPostsActivity) })
-			}.collect { cards ->
-				allCards = cards
-				applyFilter()
-			}
+			repository.observeItems(postedBy = uid)
+				.catch { error ->
+					Log.e(TAG, "Unable to load current user's posts", error)
+					Toast.makeText(this@MyPostsActivity, R.string.items_load_failed, Toast.LENGTH_SHORT).show()
+					emit(emptyList())
+				}
+				.collect { items ->
+					val cards = items.map { it.toItemCard(this@MyPostsActivity) }
+					allCards = cards
+					applyFilter()
+				}
 		}
 	}
 
@@ -129,5 +134,9 @@ class MyPostsActivity : AppCompatActivity() {
 		ALL,
 		LOST,
 		FOUND
+	}
+
+	private companion object {
+		const val TAG = "MyPostsActivity"
 	}
 }

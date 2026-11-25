@@ -2,6 +2,7 @@ package com.example.cos30017developmentproject
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageButton
@@ -19,8 +20,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.example.cos30017developmentproject.data.local.AppDatabase
-import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.ui.home.ItemCardAdapter
 import com.example.cos30017developmentproject.ui.home.toItemCard
@@ -28,7 +28,7 @@ import com.example.cos30017developmentproject.ui.items.ItemFilter
 import com.example.cos30017developmentproject.ui.items.ItemsPage
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigation.NavigationView
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -37,7 +37,7 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var sideNavigation: NavigationView
 	private lateinit var itemsPage: ItemsPage
 	private lateinit var backCallback: OnBackPressedCallback
-	private lateinit var repository: LostAndFoundRepository
+	private lateinit var firestoreRepository: FirestoreItemRepository
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -47,8 +47,8 @@ class MainActivity : AppCompatActivity() {
 		bottomNavigation = findViewById(R.id.bottom_navigation)
 		bottomNavigation.isItemActiveIndicatorEnabled = false
 		sideNavigation = findViewById(R.id.side_navigation)
-		repository = LostAndFoundRepository(AppDatabase.getInstance(this))
-		itemsPage = ItemsPage(findViewById(R.id.items_page), window, savedInstanceState, repository, this)
+		firestoreRepository = FirestoreItemRepository()
+		itemsPage = ItemsPage(findViewById(R.id.items_page), window, savedInstanceState, firestoreRepository, this)
 		ViewCompat.setOnApplyWindowInsetsListener(drawer) { _, insets ->
 			val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
 			val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime())            // DrawerLayout lays out children without respecting its own padding.
@@ -76,10 +76,17 @@ class MainActivity : AppCompatActivity() {
 			}
 			adapter = itemAdapter
 			lifecycleScope.launch {
-				combine(repository.observeLostItems(), repository.observeFoundItems()) { lost, found ->
-					(lost.map { it.toItemCard(this@MainActivity) } +
-						found.map { it.toItemCard(this@MainActivity) }).take(4)
-				}.collect { itemAdapter.submitList(it) }
+				firestoreRepository.observeItems()
+					.catch { error ->
+						Log.e(TAG, "Unable to load home items", error)
+						Toast.makeText(this@MainActivity, R.string.items_load_failed, Toast.LENGTH_SHORT).show()
+						emit(emptyList())
+					}
+					.collect { items ->
+						val cards = items.map { it.toItemCard(this@MainActivity) }.take(4)
+						itemAdapter.submitList(cards)
+						findViewById<View>(R.id.home_items_empty).isVisible = cards.isEmpty()
+					}
 			}
 		}
 		backCallback = object : OnBackPressedCallback(false) {
@@ -250,5 +257,6 @@ class MainActivity : AppCompatActivity() {
 
 	companion object {
 		const val EXTRA_SELECTED_NAVIGATION = "selected_navigation"
+		private const val TAG = "MainActivity"
 	}
 }

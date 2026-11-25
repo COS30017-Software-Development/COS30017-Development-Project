@@ -13,10 +13,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.cos30017developmentproject.auth.SessionManager
-import com.example.cos30017developmentproject.data.local.AppDatabase
-import com.example.cos30017developmentproject.data.local.FoundItemEntity
-import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
-import com.example.cos30017developmentproject.data.local.LostItemEntity
+import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
 import com.example.cos30017developmentproject.ui.items.ItemValidation
 import com.example.cos30017developmentproject.ui.items.ItemValidationError
 import com.google.android.material.button.MaterialButton
@@ -24,7 +21,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class AddItemActivity : AppCompatActivity() {
-	private lateinit var repository: LostAndFoundRepository
+	private lateinit var repository: FirestoreItemRepository
 	private lateinit var sessionManager: SessionManager
 	private var isSaving = false
 
@@ -44,7 +41,7 @@ class AddItemActivity : AppCompatActivity() {
 			view.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, keyboard.bottom))
 			WindowInsetsCompat.CONSUMED
 		}
-		repository = LostAndFoundRepository(AppDatabase.getInstance(this))
+		repository = FirestoreItemRepository()
 		findViewById<View>(R.id.add_item_cancel).setOnClickListener { finish() }
 		findViewById<View>(R.id.add_item_save).setOnClickListener { saveItem() }
 	}
@@ -61,40 +58,18 @@ class AddItemActivity : AppCompatActivity() {
 			showValidationError(validationError)
 			return
 		}
-		val userId = sessionManager.userId
-		if (userId == null) {
+		if (sessionManager.userId == null || repository.currentUserUid == null) {
 			startActivity(Intent(this, AuthActivity::class.java))
 			finish()
 			return
 		}
 		val isLost = findViewById<RadioGroup>(R.id.add_item_type).checkedRadioButtonId == R.id.add_item_type_lost
+		val type = if (isLost) FirestoreItemRepository.TYPE_LOST else FirestoreItemRepository.TYPE_FOUND
 		isSaving = true
 		findViewById<MaterialButton>(R.id.add_item_save).isEnabled = false
 		lifecycleScope.launch {
 			try {
-				if (isLost) {
-					repository.addLostItem(
-						LostItemEntity(
-							title = title,
-							description = description,
-							location = location,
-							category = category,
-							imageName = imageName,
-							postedByUserId = userId
-						)
-					)
-				} else {
-					repository.addFoundItem(
-						FoundItemEntity(
-							title = title,
-							description = description,
-							location = location,
-							category = category,
-							imageName = imageName,
-							postedByUserId = userId
-						)
-					)
-				}
+				repository.createItem(title, description, category, location, type, imageName)
 				Toast.makeText(this@AddItemActivity, R.string.item_posted, Toast.LENGTH_SHORT).show()
 				finish()
 			} catch (e: CancellationException) {
