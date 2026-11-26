@@ -16,14 +16,15 @@ Tests are recorded only from observed results. A test remains `NOT TESTED` until
 | Test 10 | Error Handling | Temporarily disable the test device's internet, open the Items page, and observe loading/error feedback and app stability. | The app remains usable and reports a clear load error or cached results without crashing. | User reports the Items page displayed cached items while offline. No crash was reported; test-device network was restored afterward. | PASS | None observed. | None | User feedback: network `off`; offline Items result `cached`; network later `restored`. |
 | Test 11 | Existing Automated Tests | Run `.\gradlew.bat testDebugUnitTest --console=plain`. | Existing JVM unit tests complete successfully. | The `testDebugUnitTest` task passed in the latest combined unit-test and Debug build run. | PASS | None observed. | None | Gradle command: `.\gradlew.bat testDebugUnitTest assembleDebug --console=plain`; `BUILD SUCCESSFUL in 15s`. |
 | Test 12 | Final Regression Testing | Recheck launch, login session, navigation, item filters, and post form validation after changes. | All previously passing core flows still work; no regressions or crashes. | User reports Home opened, Items and its filters loaded after network restoration, and the Posts form opened with neither Lost nor Found selected. | PASS | None observed. | None | User feedback: `opened` for Home, `loaded` for Items after restoring network, and `correct` for the post form's unselected type state. |
+| Test 13 | Other-user Claim Request | From the signed-in student account, submit a claim on another test user's open Found item, then check My Claims. | The claim is accepted as pending and appears in My Claims; no real user's item is altered. | User reports the updated app opened, the requested button styling works, and the Items list reopened. A candidate from another user's Found items is available; claim submission and My Claims verification remain pending. | NOT TESTED | Not assessed. | None | User feedback: selected `submit` scope, reported a candidate from another user, confirmed `ui成功修改`, and `opened` Items after latest launch; `assembleDebug` succeeded after the style change. |
 
 ## Summary
 
 - PASS: 11
 - FAIL: 0
-- NOT TESTED: 1
+- NOT TESTED: 2
 - NOT IMPLEMENTED: 0
-- Remaining issues: Admin login/permissions could not be verified because no admin test account is available. Image Name validation is deferred per user request.
+- Remaining issues: Admin login/permissions could not be verified because no admin test account is available; Test 13 claim flow is pending. Image Name validation is deferred per user request.
 
 ## Requested UI Adjustment
 
@@ -31,3 +32,4 @@ Tests are recorded only from observed results. A test remains `NOT TESTED` until
 - Saving without explicitly choosing a type is blocked with a prompt.
 - Verification: focused unit tests, Debug build, updated-app launch, no-default selection, and blocking/prompt when no type is selected all passed.
 - User requested an **Items** entry in the navigation drawer that opens the same Items page as bottom navigation, with inline Lost/Found filters; then requested removing the separate Lost/Found and Search drawer entries. The home search input remains unchanged. Focused tests/build and user-reported manual verification passed. A first compile caught stale drawer IDs in `ProfileActivity.kt`; its route now uses the new Items entry and the rerun passed.
+- User requested the Item Details **Back to Items** button use a transparent fill with red outline and text; **Submit Claim** remains red-filled. Styling change, `assembleDebug`, updated app launch, and user-reported UI verification passed.
