@@ -30,7 +30,7 @@
 				style = "@style/Campus.SectionTitle"
 				android:layout_width = "match_parent"
 				android:layout_height = "wrap_content"
-				android:text = "@string/all_items" />
+				android:text = "@string/items" />
 
 			<TextView
 				android:id = "@+id/items_result_count"
@@ -51,6 +51,47 @@
 			android:src = "@drawable/ic_view_list"
 			app:tint = "@color/brand_red_accessible" />
 	</LinearLayout >
+
+	<com.google.android.material.button.MaterialButtonToggleGroup
+		android:id = "@+id/items_filter_group"
+		android:layout_width = "match_parent"
+		android:layout_height = "wrap_content"
+		android:layout_marginHorizontal = "16dp"
+		android:layout_marginBottom = "8dp"
+		app:selectionRequired = "true"
+		app:singleSelection = "true" >
+
+		<com.google.android.material.button.MaterialButton
+			android:id = "@+id/items_filter_all"
+			style = "@style/Widget.MaterialComponents.Button.OutlinedButton"
+			android:layout_width = "0dp"
+			android:layout_height = "wrap_content"
+			android:layout_weight = "1"
+			android:checked = "true"
+			android:minHeight = "48dp"
+			android:text = "@string/item_filter_all"
+			android:textAllCaps = "false" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id = "@+id/items_filter_lost"
+			style = "@style/Widget.MaterialComponents.Button.OutlinedButton"
+			android:layout_width = "0dp"
+			android:layout_height = "wrap_content"
+			android:layout_weight = "1"
+			android:minHeight = "48dp"
+			android:text = "@string/lost"
+			android:textAllCaps = "false" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id = "@+id/items_filter_found"
+			style = "@style/Widget.MaterialComponents.Button.OutlinedButton"
+			android:layout_width = "0dp"
+			android:layout_height = "wrap_content"
+			android:layout_weight = "1"
+			android:minHeight = "48dp"
+			android:text = "@string/found"
+			android:textAllCaps = "false" />
+	</com.google.android.material.button.MaterialButtonToggleGroup>
 
 	<FrameLayout
 		android:layout_width = "match_parent"

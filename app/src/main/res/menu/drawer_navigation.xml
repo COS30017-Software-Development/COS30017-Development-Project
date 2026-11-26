@@ -5,6 +5,10 @@
 			android:icon = "@drawable/ic_home"
 			android:title = "@string/home" />
 		<item
+			android:id = "@+id/drawer_items"
+			android:icon = "@drawable/ic_items"
+			android:title = "@string/items" />
+		<item
 			android:id = "@+id/drawer_lost"
 			android:icon = "@drawable/ic_lost"
 			android:title = "@string/lost" />

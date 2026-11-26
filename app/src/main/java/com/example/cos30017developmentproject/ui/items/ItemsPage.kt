@@ -24,12 +24,23 @@ import com.example.cos30017developmentproject.data.remote.FirestoreItemRepositor
 import com.example.cos30017developmentproject.ui.home.ItemCardAdapter
 import com.example.cos30017developmentproject.ui.home.ItemCard
 import com.example.cos30017developmentproject.ui.home.toItemCard
+import com.google.android.material.button.MaterialButtonToggleGroup
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-enum class ItemFilter { ALL, LOST, FOUND }
+enum class ItemFilter {
+	ALL,
+	LOST,
+	FOUND;
+
+	fun includes(itemType: String): Boolean = when (this) {
+		ALL -> true
+		LOST -> itemType == FirestoreItemRepository.TYPE_LOST
+		FOUND -> itemType == FirestoreItemRepository.TYPE_FOUND
+	}
+}
 
 class ItemsPage(
 	private val view: View,
@@ -41,6 +52,7 @@ class ItemsPage(
 	private val insetsController = WindowCompat.getInsetsController(window, view)
 	private val search = view.findViewById<EditText>(R.id.items_search)
 	private val list = view.findViewById<RecyclerView>(R.id.items_list)
+	private val filterGroup = view.findViewById<MaterialButtonToggleGroup>(R.id.items_filter_group)
 	private val toggle = view.findViewById<ImageButton>(R.id.toggle_item_layout)
 	private val previous = view.findViewById<ImageButton>(R.id.previous_page)
 	private val next = view.findViewById<ImageButton>(R.id.next_page)
@@ -63,6 +75,10 @@ class ItemsPage(
 	init {
 		list.layoutManager = layout
 		list.adapter = adapter
+		filterGroup.check(filterButtonId(filter))
+		filterGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+			if (isChecked) filterForButton(checkedId)?.let(::setFilter)
+		}
 		search.setText(savedState?.getString("items.query").orEmpty())
 		search.doAfterTextChanged {
 			pagination.search(it.toString())
@@ -85,9 +101,10 @@ class ItemsPage(
 	}
 
 	fun setFilter(newFilter: ItemFilter) {
-		if (filter == newFilter) return
+		val changed = filter != newFilter
 		filter = newFilter
-		observeItems()
+		filterGroup.check(filterButtonId(newFilter))
+		if (changed) observeItems()
 	}
 
 	fun focusSearch() {
@@ -114,11 +131,7 @@ class ItemsPage(
 				}
 				.map { items ->
 					items.filter { item ->
-						when (filter) {
-							ItemFilter.ALL -> true
-							ItemFilter.LOST -> item.type == FirestoreItemRepository.TYPE_LOST
-							ItemFilter.FOUND -> item.type == FirestoreItemRepository.TYPE_FOUND
-						}
+						filter.includes(item.type)
 					}.map { it.toItemCard(context) }
 				}
 				.collect { items ->
@@ -136,6 +149,19 @@ class ItemsPage(
 	private fun changePage(offset: Int) {
 		pagination.goToPage(pagination.pageIndex + offset)
 		render()
+	}
+
+	private fun filterButtonId(filter: ItemFilter): Int = when (filter) {
+		ItemFilter.ALL -> R.id.items_filter_all
+		ItemFilter.LOST -> R.id.items_filter_lost
+		ItemFilter.FOUND -> R.id.items_filter_found
+	}
+
+	private fun filterForButton(buttonId: Int): ItemFilter? = when (buttonId) {
+		R.id.items_filter_all -> ItemFilter.ALL
+		R.id.items_filter_lost -> ItemFilter.LOST
+		R.id.items_filter_found -> ItemFilter.FOUND
+		else -> null
 	}
 
 	private fun render() {

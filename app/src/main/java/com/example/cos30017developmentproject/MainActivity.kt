@@ -154,12 +154,14 @@ class MainActivity : AppCompatActivity() {
 			if (item.itemId == R.id.drawer_home) {
 				bottomNavigation.selectedItemId = R.id.nav_home
 				scrollHomeToTop()
+			} else if (item.itemId == R.id.drawer_items) {
+				showItems(ItemFilter.ALL, R.id.drawer_items)
 			} else if (item.itemId == R.id.drawer_lost) {
 				showItems(ItemFilter.LOST)
 			} else if (item.itemId == R.id.drawer_found) {
 				showItems(ItemFilter.FOUND)
 			} else if (item.itemId == R.id.drawer_search) {
-				showItems(ItemFilter.ALL)
+				showItems(ItemFilter.ALL, R.id.drawer_search)
 				itemsPage.focusSearch()
 			} else if (item.itemId == R.id.drawer_post) {
 				openPost()
@@ -194,12 +196,12 @@ class MainActivity : AppCompatActivity() {
 		updateBackCallback()
 	}
 
-	private fun showItems(filter: ItemFilter) {
+	private fun showItems(filter: ItemFilter, selectedDrawerItem: Int? = null) {
 		itemsPage.setFilter(filter)
 		showPage(true)
 		sideNavigation.setCheckedItem(
-			when (filter) {
-				ItemFilter.ALL -> R.id.drawer_search
+			selectedDrawerItem ?: when (filter) {
+				ItemFilter.ALL -> R.id.drawer_items
 				ItemFilter.LOST -> R.id.drawer_lost
 				ItemFilter.FOUND -> R.id.drawer_found
 			}
