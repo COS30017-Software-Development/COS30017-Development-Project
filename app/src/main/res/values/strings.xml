@@ -30,7 +30,17 @@ Bring it home.</string >
 	<string name = "sample_headphones_description" >Found in a campus study area. Black over-ear headphones.</string >
 	<string name = "sample_keys_title" >Set of keys</string >
 	<string name = "sample_keys_description" >Lost on campus. Two keys attached to a red key ring.</string >
-	<string name = "item_image_description" >Sample illustration of %1$s</string >
+	<string name = "item_image_description" >Image of %1$s</string >
+	<string name="item_image_section">Item photo (optional)</string>
+	<string name="item_image_take_photo">Take photo</string>
+	<string name="item_image_choose_gallery">Choose from gallery</string>
+	<string name="item_image_remove">Remove photo</string>
+	<string name="item_image_too_large">Choose an image smaller than 5 MB.</string>
+	<string name="item_image_invalid">Unable to use that image. Choose a valid photo and try again.</string>
+	<string name="item_image_cleanup_failed">The item was saved, but its previous photo could not be removed.</string>
+	<string name="item_delete_cleanup_failed">The item was deleted, but its photo could not be removed from storage.</string>
+	<string name="item_image_preview_description">Full-size item photo</string>
+	<string name="close_image_preview">Close image preview</string>
 	<string name = "all_items" >All items</string >
 	<string name = "switch_to_list" >Switch to list view</string >
 	<string name = "switch_to_grid" >Switch to grid view</string >
@@ -127,7 +137,6 @@ Bring it home.</string >
 	<string name="item_action_not_allowed">You can only manage your own item.</string>
 	<string name="edit_item_title">Edit item</string>
 	<string name="item_name">Item name</string>
-	<string name="item_image_name">Image resource name</string>
 	<string name="save_changes">Save changes</string>
 	<string name="item_updated">Item updated.</string>
 	<string name="item_fields_required">Complete all item fields.</string>
@@ -135,7 +144,6 @@ Bring it home.</string >
 	<string name="item_category_too_long">Category is too long.</string>
 	<string name="item_location_too_long">Location is too long.</string>
 	<string name="item_description_too_long">Description is too long.</string>
-	<string name="item_image_name_invalid">Use a lowercase drawable name such as sample_backpack.</string>
 	<string name="item_save_failed">Unable to save this item. Please try again.</string>
 	<string name="items_load_failed">Unable to load items. Check your connection and try again.</string>
 	<string name="add_item_title">Post an item</string>

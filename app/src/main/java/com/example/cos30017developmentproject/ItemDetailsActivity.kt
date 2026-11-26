@@ -21,6 +21,7 @@ import com.example.cos30017developmentproject.data.local.ItemStatus
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
 import com.example.cos30017developmentproject.data.remote.FirestoreClaimRepository
 import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
+import com.example.cos30017developmentproject.ui.home.ItemImageLoader
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -81,6 +82,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 							location = it.location,
 							category = it.category,
 							imageName = it.imageName,
+							imageUrl = it.imageUrl,
 							postedByUid = it.postedBy,
 							status = it.status,
 							isFirestoreItem = true
@@ -143,10 +145,12 @@ class ItemDetailsActivity : AppCompatActivity() {
 
 	private fun bindItem(item: ItemDetails, type: String, username: String?) {
 		val imageId = resources.getIdentifier(item.imageName, "drawable", packageName)
-		findViewById<ImageView>(R.id.item_details_image).setImageResource(
-			if (imageId != 0) imageId else R.drawable.sample_backpack
-		)
-		findViewById<ImageView>(R.id.item_details_image).contentDescription = getString(R.string.item_image_description, item.title)
+		val fallback = if (imageId != 0) imageId else R.drawable.sample_backpack
+		findViewById<ImageView>(R.id.item_details_image).apply {
+			ItemImageLoader.load(this, item.imageUrl, fallback, ImageView.ScaleType.CENTER_CROP)
+			contentDescription = getString(R.string.item_image_description, item.title)
+			setOnClickListener { ItemImageLoader.showPreview(this@ItemDetailsActivity, item.imageUrl, fallback) }
+		}
 		findViewById<TextView>(R.id.item_details_name).text = item.title
 		findViewById<TextView>(R.id.item_details_type).text = getString(
 			R.string.item_type_format,
@@ -329,13 +333,14 @@ class ItemDetailsActivity : AppCompatActivity() {
 						showPermissionDenied()
 						return@launch
 					}
+				var cleanupFailed = false
 				val cloudItem = firestoreRepository.getItem(id)
 				if (cloudItem != null) {
 					if (cloudItem.postedBy != firestoreRepository.currentUserUid) {
 						showPermissionDenied()
 						return@launch
 					}
-					firestoreRepository.deleteItem(id)
+					cleanupFailed = firestoreRepository.deleteItem(id) != null
 				} else {
 					val roomId = id.toLongOrNull()
 						?: run {
@@ -352,7 +357,11 @@ class ItemDetailsActivity : AppCompatActivity() {
 						return@launch
 					}
 				}
-				Toast.makeText(this@ItemDetailsActivity, R.string.item_deleted, Toast.LENGTH_SHORT).show()
+				Toast.makeText(
+					this@ItemDetailsActivity,
+					if (cleanupFailed) R.string.item_delete_cleanup_failed else R.string.item_deleted,
+					Toast.LENGTH_SHORT
+				).show()
 				finish()
 			} catch (e: CancellationException) {
 				throw e
@@ -395,6 +404,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 		val location: String,
 		val category: String,
 		val imageName: String,
+		val imageUrl: String? = null,
 		val postedByUid: String?,
 		val postedByUserId: Long? = null,
 		val status: String = ItemStatus.OPEN,

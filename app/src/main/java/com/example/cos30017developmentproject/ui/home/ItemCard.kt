@@ -13,7 +13,8 @@ data class ItemCard(
 	val title: String,
 	val description: String,
 	@param:DrawableRes @get:DrawableRes val image: Int,
-	val isFound: Boolean
+	val isFound: Boolean,
+	val imageUrl: String? = null
 )
 
 fun LostItemEntity.toItemCard(context: Context) = ItemCard(
@@ -37,7 +38,8 @@ fun FirestoreItem.toItemCard(context: Context) = ItemCard(
 	title = itemName,
 	description = description,
 	image = context.drawableId(imageName),
-	isFound = type == FirestoreItemRepository.TYPE_FOUND
+	isFound = type == FirestoreItemRepository.TYPE_FOUND,
+	imageUrl = imageUrl
 )
 
 private fun Context.drawableId(imageName: String): Int =

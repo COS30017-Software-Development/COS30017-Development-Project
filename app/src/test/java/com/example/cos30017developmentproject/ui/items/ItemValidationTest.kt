@@ -5,12 +5,12 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ItemValidationTest {
-	private fun validInput() = listOf("Backpack", "Backpack", "Library", "Found near the library", "sample_backpack")
+	private fun validInput() = listOf("Backpack", "Backpack", "Library", "Found near the library")
 
 	@Test
 	fun validItemPassesValidation() {
 		val input = validInput()
-		assertNull(ItemValidation.validate(input[0], input[1], input[2], input[3], input[4]))
+		assertNull(ItemValidation.validate(input[0], input[1], input[2], input[3]))
 	}
 
 	@Test
@@ -18,7 +18,7 @@ class ItemValidationTest {
 		val input = validInput()
 		assertEquals(
 			ItemValidationError.REQUIRED,
-			ItemValidation.validate(input[0], " ", input[2], input[3], input[4])
+			ItemValidation.validate(input[0], " ", input[2], input[3])
 		)
 	}
 
@@ -26,15 +26,15 @@ class ItemValidationTest {
 	fun oversizedTitleFailsValidation() {
 		assertEquals(
 			ItemValidationError.TITLE_TOO_LONG,
-			ItemValidation.validate("x".repeat(101), "Bag", "Library", "Description", "sample_bag")
+			ItemValidation.validate("x".repeat(101), "Bag", "Library", "Description")
 		)
 	}
 
 	@Test
-	fun invalidImageNameFailsValidation() {
+	fun imageIsNotRequiredForAnItem() {
 		assertEquals(
-			ItemValidationError.INVALID_IMAGE_NAME,
-			ItemValidation.validate("Bag", "Bag", "Library", "Description", "Sample-Bag")
+			null,
+			ItemValidation.validate("Bag", "Bag", "Library", "Description")
 		)
 	}
 }

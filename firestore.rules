@@ -24,7 +24,7 @@ service cloud.firestore {
     function validItem(data) {
       return data.keys().hasAll([
           'itemId', 'itemName', 'description', 'category', 'location',
-          'date', 'type', 'imageUrl', 'imageName', 'status', 'postedBy'
+          'date', 'type', 'imageName', 'status', 'postedBy'
         ])
         && data.keys().hasOnly([
           'itemId', 'itemName', 'description', 'category', 'location',
@@ -38,7 +38,7 @@ service cloud.firestore {
         && data.location is string && data.location.size() > 0 && data.location.size() <= 100
         && data.date is timestamp
         && data.type in ['LOST', 'FOUND']
-        && (data.imageUrl == null || data.imageUrl is string)
+        && (!data.keys().hasAny(['imageUrl']) || data.imageUrl == null || data.imageUrl is string)
         && data.imageName is string && data.imageName.size() > 0 && data.imageName.size() <= 100
         && data.status in ['OPEN', 'CLAIMED', 'PENDING_RETURN', 'CLOSED']
         && (!data.keys().hasAny(['pendingClaimCount'])
@@ -219,10 +219,9 @@ service cloud.firestore {
         && request.resource.data.postedBy == resource.data.postedBy
         && request.resource.data.date == resource.data.date
         && request.resource.data.type == resource.data.type
-        && request.resource.data.imageUrl == resource.data.imageUrl
         && request.resource.data.status == resource.data.status
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['itemName', 'description', 'category', 'location', 'imageName'])
+          .hasOnly(['itemName', 'description', 'category', 'location', 'imageName', 'imageUrl'])
       ) || validRequestItemUpdate(itemId);
       allow delete: if signedIn()
         && (resource.data.postedBy == request.auth.uid || isAdmin())

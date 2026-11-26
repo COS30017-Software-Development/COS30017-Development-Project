@@ -16,6 +16,7 @@ import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
 import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
+import com.example.cos30017developmentproject.ui.home.ItemImageLoader
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.CancellationException
@@ -87,12 +88,15 @@ class AdminItemDetailsActivity : AppCompatActivity() {
 					cloudItem.location,
 					cloudItem.category,
 					cloudItem.imageName,
+					cloudItem.imageUrl,
 					poster
 				)
 				val imageId = resources.getIdentifier(details.imageName, "drawable", packageName)
-				findViewById<ImageView>(R.id.admin_item_image).setImageResource(
-					if (imageId != 0) imageId else R.drawable.sample_backpack
-				)
+				val fallback = if (imageId != 0) imageId else R.drawable.sample_backpack
+				findViewById<ImageView>(R.id.admin_item_image).apply {
+					ItemImageLoader.load(this, details.imageUrl, fallback, ImageView.ScaleType.CENTER_CROP)
+					setOnClickListener { ItemImageLoader.showPreview(this@AdminItemDetailsActivity, details.imageUrl, fallback) }
+				}
 				findViewById<TextView>(R.id.admin_item_name).text = details.title
 				findViewById<TextView>(R.id.admin_item_type).text = itemType
 				findViewById<TextView>(R.id.admin_item_category).text = details.category
@@ -128,8 +132,12 @@ class AdminItemDetailsActivity : AppCompatActivity() {
 					denyAccess()
 					return@launch
 				}
-				firestoreRepository.deleteItem(itemId)
-				Toast.makeText(this@AdminItemDetailsActivity, R.string.item_deleted, Toast.LENGTH_SHORT).show()
+				val cleanupError = firestoreRepository.deleteItem(itemId)
+				if (cleanupError != null) {
+					Toast.makeText(this@AdminItemDetailsActivity, R.string.item_delete_cleanup_failed, Toast.LENGTH_SHORT).show()
+				} else {
+					Toast.makeText(this@AdminItemDetailsActivity, R.string.item_deleted, Toast.LENGTH_SHORT).show()
+				}
 				finish()
 			} catch (exception: CancellationException) {
 				throw exception
@@ -153,6 +161,7 @@ class AdminItemDetailsActivity : AppCompatActivity() {
 		val location: String,
 		val category: String,
 		val imageName: String,
+		val imageUrl: String?,
 		val poster: com.example.cos30017developmentproject.data.local.UserEntity?
 	)
 

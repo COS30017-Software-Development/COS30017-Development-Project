@@ -62,8 +62,11 @@ class ItemCardAdapter(
 
 		fun bind(item: ItemCard) {
 			val context = itemView.context
-			image.setImageResource(item.image)
+			ItemImageLoader.load(image, item.imageUrl, item.image, ImageView.ScaleType.CENTER_CROP)
 			image.contentDescription = context.getString(R.string.item_image_description, item.title)
+			image.setOnClickListener {
+				ItemImageLoader.showPreview(context, item.imageUrl, item.image)
+			}
 			title.text = item.title
 			description.text = item.description
 			type.setText(if (item.isFound) R.string.found else R.string.lost)
