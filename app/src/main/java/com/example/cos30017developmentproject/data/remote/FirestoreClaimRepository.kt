@@ -152,7 +152,7 @@ class FirestoreClaimRepository(
 			firestore.runTransaction { transaction ->
 				val item = transaction.get(itemReference)
 				if (!item.exists()) return@runTransaction ClaimSubmissionResult.ITEM_NOT_FOUND
-				val itemType = item.getString(FIELD_ITEM_TYPE)
+				val itemType = item.getString(FIELD_TYPE)
 					?: return@runTransaction ClaimSubmissionResult.ITEM_NOT_FOUND
 				if (itemType !in setOf(FirestoreItemRepository.TYPE_FOUND, FirestoreItemRepository.TYPE_LOST)) {
 					return@runTransaction ClaimSubmissionResult.ITEM_NOT_FOUND
@@ -261,7 +261,7 @@ class FirestoreClaimRepository(
 				val senderUid = claim.getString(FIELD_STUDENT_ID)
 					?: return@runTransaction ClaimReviewResult.NOT_FOUND
 				val itemType = claim.getString(FIELD_ITEM_TYPE)
-					?: item.getString(FIELD_ITEM_TYPE)
+					?: item.getString(FIELD_TYPE)
 					?: return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
 				val itemTitle = claim.getString(FIELD_ITEM_TITLE)
 					?: item.getString(FIELD_ITEM_NAME)
@@ -422,6 +422,7 @@ class FirestoreClaimRepository(
 		const val FIELD_STUDENT_EMAIL = "studentEmail"
 		const val FIELD_STUDENT_NUMBER = "studentNumber"
 		const val FIELD_POSTED_BY = "postedBy"
+		const val FIELD_TYPE = "type"
 		const val FIELD_ITEM_NAME = "itemName"
 		const val FIELD_ITEM_LOCATION = "location"
 		const val FIELD_LAST_ACCEPTED_REQUEST_ID = "lastAcceptedRequestId"
