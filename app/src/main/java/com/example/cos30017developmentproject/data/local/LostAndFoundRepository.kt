@@ -78,7 +78,7 @@ class LostAndFoundRepository(database: AppDatabase) {
 	fun observeAllClaims(): Flow<List<ClaimEntity>> = claims.observeAll()
 	suspend fun hasClaim(userId: Long, foundItemId: Long): Boolean =
 		claims.getByClaimantAndItem(userId, foundItemId)
-			?.let { it.status != ClaimStatus.REJECTED } ?: false
+			?.let { it.status != ClaimStatus.REJECTED && it.status != "REJECTED" } ?: false
 
 	suspend fun submitClaim(foundItemId: Long, claimantUserId: Long, description: String): ClaimSubmissionResult {
 		return try {
@@ -92,7 +92,9 @@ class LostAndFoundRepository(database: AppDatabase) {
 					return@withTransaction ClaimSubmissionResult.OWNER_CANNOT_CLAIM
 				}
 				val existingClaim = claims.getByClaimantAndItem(claimantUserId, foundItemId)
-				if (existingClaim != null && existingClaim.status != ClaimStatus.REJECTED) {
+				if (existingClaim != null && existingClaim.status != ClaimStatus.REJECTED &&
+					existingClaim.status != "REJECTED"
+				) {
 					return@withTransaction ClaimSubmissionResult.ALREADY_CLAIMED
 				}
 				val validatedDescription = description.trim()
@@ -122,7 +124,6 @@ class LostAndFoundRepository(database: AppDatabase) {
 					existingClaim.id
 				}
 				if (id <= 0) return@withTransaction ClaimSubmissionResult.FAILED
-				foundItems.updateStatusIfOpen(foundItemId, ItemStatus.CLAIMED)
 				ClaimSubmissionResult.SUCCESS
 			}
 		} catch (exception: kotlinx.coroutines.CancellationException) {
@@ -135,6 +136,33 @@ class LostAndFoundRepository(database: AppDatabase) {
 	suspend fun isAdmin(userId: Long): Boolean {
 		val firebaseUid = users.getById(userId)?.firebaseUid ?: return false
 		return FirebaseAuthManager().hasAdminRole(firebaseUid)
+	}
+
+	suspend fun acceptClaim(claimId: Long, ownerId: Long): ClaimReviewResult {
+		return try {
+			database.withTransaction {
+				val claim = claims.getById(claimId)
+					?: return@withTransaction ClaimReviewResult.NOT_FOUND
+				if (!ClaimReviewPolicy.canProcess(claim.status)) {
+					return@withTransaction ClaimReviewResult.ALREADY_PROCESSED
+				}
+				val item = foundItems.getById(claim.foundItemId)
+					?: return@withTransaction ClaimReviewResult.ITEM_NOT_FOUND
+				if (item.postedByUserId != ownerId) return@withTransaction ClaimReviewResult.ACCESS_DENIED
+				if (item.status == ItemStatus.CLOSED) return@withTransaction ClaimReviewResult.ITEM_CLOSED
+				if (foundItems.updateStatusIfNotClosed(item.id, ItemStatus.PENDING_RETURN) != 1) {
+					return@withTransaction ClaimReviewResult.ITEM_CLOSED
+				}
+				if (claims.updateStatusIfPending(claimId, ClaimStatus.APPROVED) != 1) {
+					throw IllegalStateException("Request processing changed concurrently")
+				}
+				ClaimReviewResult.SUCCESS
+			}
+		} catch (exception: kotlinx.coroutines.CancellationException) {
+			throw exception
+		} catch (_: Exception) {
+			ClaimReviewResult.FAILED
+		}
 	}
 
 	suspend fun approveClaim(claimId: Long, adminId: Long): ClaimReviewResult {

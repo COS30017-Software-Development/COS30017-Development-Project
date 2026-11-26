@@ -150,19 +150,16 @@ interface ClaimDao {
 	@Insert(onConflict = OnConflictStrategy.ABORT)
 	suspend fun insert(claim: ClaimEntity): Long
 
-	@Query("UPDATE claims SET status = :status WHERE id = :id AND status = 'PENDING'")
+	@Query("UPDATE claims SET status = :status WHERE id = :id AND status IN ('Pending', 'PENDING')")
 	suspend fun updateStatusIfPending(id: Long, status: String): Int
 
 	@Query("""
 		UPDATE claims
-		SET description = :description, status = 'PENDING', submitted_at = :submittedAt
-		WHERE id = :id AND status = 'REJECTED'
+		SET description = :description, status = 'Pending', submitted_at = :submittedAt
+		WHERE id = :id AND status IN ('Rejected', 'REJECTED')
 	""")
 	suspend fun resubmitRejected(id: Long, description: String, submittedAt: Long): Int
 
-	@Query("UPDATE claims SET status = 'REJECTED' WHERE found_item_id = :foundItemId AND id != :approvedClaimId AND status = 'PENDING'")
-	suspend fun rejectOtherPending(foundItemId: Long, approvedClaimId: Long): Int
-
-	@Query("SELECT COUNT(*) FROM claims WHERE found_item_id = :foundItemId AND status = 'PENDING'")
+	@Query("SELECT COUNT(*) FROM claims WHERE found_item_id = :foundItemId AND status IN ('Pending', 'PENDING')")
 	suspend fun countPendingForItem(foundItemId: Long): Int
 }

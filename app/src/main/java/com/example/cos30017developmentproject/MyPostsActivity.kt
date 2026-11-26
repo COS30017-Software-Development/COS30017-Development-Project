@@ -128,16 +128,16 @@ class MyPostsActivity : AppCompatActivity() {
 					if (item.isFound) ItemDetailsActivity.TYPE_FOUND else ItemDetailsActivity.TYPE_LOST
 				)
 			}
-
-			private fun backToItems() {
-				startActivity(
-					Intent(this, MainActivity::class.java)
-						.putExtra(MainActivity.EXTRA_SELECTED_NAVIGATION, R.id.nav_items)
-						.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-				)
-				finish()
-			}
 		)
+	}
+
+	private fun backToItems() {
+		startActivity(
+			Intent(this, MainActivity::class.java)
+				.putExtra(MainActivity.EXTRA_SELECTED_NAVIGATION, R.id.nav_items)
+				.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+		)
+		finish()
 	}
 
 	private enum class PostFilter {

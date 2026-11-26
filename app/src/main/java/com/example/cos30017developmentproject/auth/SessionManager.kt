@@ -1,9 +1,12 @@
 package com.example.cos30017developmentproject.auth
 
 import android.content.Context
+import android.util.Log
 import androidx.core.content.edit
 import com.example.cos30017developmentproject.data.local.UserEntity
 import com.example.cos30017developmentproject.data.local.UserRole
+import com.example.cos30017developmentproject.data.remote.FcmTokenRepository
+import com.google.firebase.messaging.FirebaseMessaging
 
 class SessionManager(context: Context) {
 	private val preferences = context.getSharedPreferences("auth_session", Context.MODE_PRIVATE)
@@ -31,6 +34,22 @@ class SessionManager(context: Context) {
 	}
 
 	fun logout() {
+		val uid = firebaseAuthManager.getCurrentUser()?.uid
+		if (uid == null) {
+			completeLogout()
+			return
+		}
+		FirebaseMessaging.getInstance().token
+			.addOnSuccessListener { token ->
+				FcmTokenRepository.unregister(uid, token, ::completeLogout)
+			}
+			.addOnFailureListener { error ->
+				Log.e(TAG, "Unable to retrieve FCM token during logout", error)
+				completeLogout()
+			}
+	}
+
+	private fun completeLogout() {
 		firebaseAuthManager.signOut()
 		preferences.edit {
 			remove(KEY_USER_ID)
@@ -40,6 +59,7 @@ class SessionManager(context: Context) {
 	}
 
 	private companion object {
+		const val TAG = "SessionManager"
 		const val KEY_USER_ID = "user_id"
 		const val KEY_FIREBASE_UID = "firebase_uid"
 		const val KEY_ROLE = "role"

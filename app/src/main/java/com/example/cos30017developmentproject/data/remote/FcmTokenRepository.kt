@@ -16,9 +16,10 @@ object FcmTokenRepository {
 		}
 	}
 
-	fun unregister(uid: String, token: String) {
-		tokenReference(uid, token).delete().addOnFailureListener { error ->
-			Log.e(TAG, "Unable to unregister FCM token", error)
+	fun unregister(uid: String, token: String, onComplete: () -> Unit = {}) {
+		tokenReference(uid, token).delete().addOnCompleteListener { task ->
+			if (!task.isSuccessful) Log.e(TAG, "Unable to unregister FCM token", task.exception)
+			onComplete()
 		}
 	}
 

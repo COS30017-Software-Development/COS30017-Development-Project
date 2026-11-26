@@ -29,7 +29,16 @@ class RequestMessagingService : FirebaseMessagingService() {
 
 	override fun onMessageReceived(message: RemoteMessage) {
 		val notificationId = message.data[FIELD_NOTIFICATION_ID] ?: return
-		if (com.example.cos30017developmentproject.LostAndFoundApplication.isInForeground) return
+		if (com.example.cos30017developmentproject.LostAndFoundApplication.isInForeground) {
+			(application as? com.example.cos30017developmentproject.LostAndFoundApplication)
+				?.showForegroundPush(
+					notificationId,
+					message.data[FIELD_TYPE].orEmpty(),
+					message.data[FIELD_TITLE].orEmpty(),
+					message.data[FIELD_MESSAGE].orEmpty()
+				)
+			return
+		}
 		if (!recordNotificationOnce(notificationId)) return
 
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&

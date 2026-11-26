@@ -193,6 +193,7 @@ service cloud.firestore {
         && requestBefore.status in ['Pending', 'PENDING']
         && requestAfter.status == 'Accepted'
         && requestAfter.ownerUid == resource.data.postedBy
+        && requestAfter.itemType == resource.data.type
         && requestAfter.itemId == itemId
         && request.resource.data.status == 'PENDING_RETURN'
         && resource.data.status in ['OPEN', 'CLAIMED', 'PENDING_RETURN']
@@ -234,11 +235,17 @@ service cloud.firestore {
           || (!exists(claimPath(claimId))
             && claimId.matches('^' + request.auth.uid + '_[A-Za-z0-9]+$'))
           || resource.data.studentId == request.auth.uid
-          || resource.data.ownerUid == request.auth.uid);
+          || resource.data.ownerUid == request.auth.uid
+          || (resource.data.itemId is string
+            && exists(itemPath(resource.data.itemId))
+            && get(itemPath(resource.data.itemId)).data.postedBy == request.auth.uid));
       allow list: if signedIn()
         && (isAdmin()
           || resource.data.studentId == request.auth.uid
-          || resource.data.ownerUid == request.auth.uid);
+          || resource.data.ownerUid == request.auth.uid
+          || (resource.data.itemId is string
+            && exists(itemPath(resource.data.itemId))
+            && get(itemPath(resource.data.itemId)).data.postedBy == request.auth.uid));
       allow create: if signedIn()
         && validClaim(request.resource.data, claimId)
         && validNewRequestNotificationLink(request.resource.data, claimId)
@@ -255,12 +262,16 @@ service cloud.firestore {
           || get(claimPath(claimId)).data.status in ['Rejected', 'REJECTED']);
       allow update: if (
         signedIn()
-        && (resource.data.ownerUid == request.auth.uid || isAdmin())
+        && (resource.data.ownerUid == request.auth.uid
+          || isAdmin()
+          || (resource.data.itemId is string
+            && exists(itemPath(resource.data.itemId))
+            && get(itemPath(resource.data.itemId)).data.postedBy == request.auth.uid))
         && resource.data.status in ['Pending', 'PENDING']
         && request.resource.data.status == 'Accepted'
         && validClaim(request.resource.data, claimId)
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'ownerUid'])
+          .hasOnly(['status', 'ownerUid', 'itemType'])
         && exists(itemPath(resource.data.itemId))
         && getAfter(itemPath(resource.data.itemId)).data.lastAcceptedRequestId == claimId
       ) || (

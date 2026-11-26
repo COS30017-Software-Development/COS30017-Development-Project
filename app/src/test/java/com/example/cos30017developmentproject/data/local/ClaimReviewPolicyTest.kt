@@ -14,7 +14,7 @@ class ClaimReviewPolicyTest {
 	}
 
 	@Test
-	fun approvedClaimsCloseFoundItem() {
-		assertEquals(ItemStatus.CLOSED, ClaimReviewPolicy.approvedItemStatus())
+	fun acceptedRequestsKeepFoundItemPendingReturn() {
+		assertEquals(ItemStatus.PENDING_RETURN, ClaimReviewPolicy.approvedItemStatus())
 	}
 }

@@ -58,7 +58,68 @@ class FirestoreClaimRepository(
 	fun observeIncomingRequests(): Flow<List<FirestoreClaim>> {
 		val uid = currentUserUid
 			?: return callbackFlow { close(IllegalStateException("A Firebase user must be signed in")) }
-		return observeClaims(claims.whereEqualTo(FIELD_OWNER_UID, uid))
+		return callbackFlow {
+			val requestRegistrations = mutableMapOf<String, ListenerRegistration>()
+			val requestsByItem = mutableMapOf<String, List<FirestoreClaim>>()
+			fun publishRequests() {
+				synchronized(requestRegistrations) {
+					trySend(
+						requestsByItem.values.flatten()
+							.distinctBy(FirestoreClaim::claimId)
+							.sortedByDescending(FirestoreClaim::submittedAt)
+					)
+				}
+			}
+
+			val itemRegistration = items.whereEqualTo(FIELD_POSTED_BY, uid)
+				.addSnapshotListener { itemSnapshot, itemError ->
+					if (itemError != null) {
+						close(itemError)
+					} else if (itemSnapshot == null) {
+						close(IllegalStateException("Firestore returned an empty owned-item snapshot"))
+					} else {
+						val itemIds = itemSnapshot.documents.mapNotNull { item ->
+							item.getString(FIELD_ITEM_ID) ?: item.id.takeIf { item.exists() }
+						}.toSet()
+						synchronized(requestRegistrations) {
+							(requestRegistrations.keys - itemIds).forEach { removedItemId ->
+								requestRegistrations.remove(removedItemId)?.remove()
+								requestsByItem.remove(removedItemId)
+							}
+							(itemIds - requestRegistrations.keys).forEach { itemId ->
+								requestRegistrations[itemId] = claims
+									.whereEqualTo(FIELD_ITEM_ID, itemId)
+									.addSnapshotListener { requestSnapshot, requestError ->
+										if (requestError != null) {
+											close(requestError)
+										} else if (requestSnapshot == null) {
+											close(IllegalStateException("Firestore returned an empty item-request snapshot"))
+										} else {
+											try {
+												synchronized(requestRegistrations) {
+													requestsByItem[itemId] = requestSnapshot.documents
+														.mapNotNull { it.toFirestoreClaim(uid) }
+													publishRequests()
+												}
+											} catch (exception: Exception) {
+												close(exception)
+											}
+										}
+									}
+							}
+							publishRequests()
+						}
+					}
+				}
+			awaitClose {
+				itemRegistration.remove()
+				synchronized(requestRegistrations) {
+					requestRegistrations.values.forEach(ListenerRegistration::remove)
+					requestRegistrations.clear()
+					requestsByItem.clear()
+				}
+			}
+		}
 	}
 
 	fun observeAllClaims(): Flow<List<FirestoreClaim>> = observeClaims(claims)
@@ -214,7 +275,8 @@ class FirestoreClaimRepository(
 					claimReference,
 					mapOf(
 						FIELD_STATUS to ClaimStatus.APPROVED,
-						FIELD_OWNER_UID to ownerUid
+						FIELD_OWNER_UID to ownerUid,
+						FIELD_ITEM_TYPE to itemType
 					)
 				)
 				transaction.update(
@@ -299,7 +361,7 @@ class FirestoreClaimRepository(
 			awaitClose { registration.remove() }
 		}
 
-	private fun DocumentSnapshot.toFirestoreClaim(): FirestoreClaim? {
+	private fun DocumentSnapshot.toFirestoreClaim(ownerUidOverride: String? = null): FirestoreClaim? {
 		if (!exists()) return null
 		val submittedAt = getTimestamp(FIELD_SUBMITTED_AT)
 			?: throw IllegalStateException("Firestore request is missing its submittedAt timestamp")
@@ -310,7 +372,7 @@ class FirestoreClaimRepository(
 			itemType = getString(FIELD_ITEM_TYPE) ?: FirestoreItemRepository.TYPE_FOUND,
 			studentId = getString(FIELD_STUDENT_ID)
 				?: throw IllegalStateException("Firestore request is missing its studentId"),
-			ownerUid = getString(FIELD_OWNER_UID).orEmpty(),
+			ownerUid = getString(FIELD_OWNER_UID) ?: ownerUidOverride.orEmpty(),
 			description = getString(FIELD_DESCRIPTION)
 				?: throw IllegalStateException("Firestore request is missing its message"),
 			status = getString(FIELD_STATUS).normalizedRequestStatus(),

@@ -12,4 +12,6 @@ class NotificationAlertTracker {
 		}
 		return ids.filter { knownIds.add(it) }
 	}
+
+	fun markNotified(id: String): Boolean = knownIds.add(id)
 }

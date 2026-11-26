@@ -71,7 +71,7 @@ class LostAndFoundRepositoryTest {
 	}
 
 	@Test
-	fun claimRejectsOwnerClosedAndDuplicateSubmissions() = runBlocking {
+	fun requestRejectsOwnerClosedAndDuplicateSubmissions() = runBlocking {
 		val ownerId = database.userDao().insert(
 			UserEntity(username = "Owner", email = "owner@test.local", studentId = "100000001")
 		)
@@ -101,6 +101,7 @@ class LostAndFoundRepositoryTest {
 			ClaimSubmissionResult.SUCCESS,
 			repository.submitClaim(foundId, claimantId, "This bag belongs to me")
 		)
+		assertEquals(ItemStatus.OPEN, repository.getFoundItem(foundId)?.status)
 		assertEquals(
 			ClaimSubmissionResult.ALREADY_CLAIMED,
 			repository.submitClaim(foundId, claimantId, "This is another claim")
@@ -114,7 +115,7 @@ class LostAndFoundRepositoryTest {
 	}
 
 	@Test
-	fun rejectedRoomClaimCanBeResubmittedWithoutCreatingDuplicate() = runBlocking {
+	fun rejectedRoomRequestCanBeResubmittedWithoutCreatingDuplicate() = runBlocking {
 		val ownerId = database.userDao().insert(
 			UserEntity(username = "Owner", email = "resubmit-owner@test.local", studentId = "110000001")
 		)
@@ -151,8 +152,49 @@ class LostAndFoundRepositoryTest {
 		assertEquals(originalClaim.id, resubmittedClaim.id)
 		assertEquals(ClaimStatus.PENDING, resubmittedClaim.status)
 		assertEquals("Here is more information about ownership", resubmittedClaim.description)
-		assertEquals(ItemStatus.CLAIMED, repository.getFoundItem(foundId)?.status)
+		assertEquals(ItemStatus.OPEN, repository.getFoundItem(foundId)?.status)
 		assertEquals(1, database.claimDao().countPendingForItem(foundId))
+	}
+
+	@Test
+	fun ownerAcceptsOneRequestWithoutChangingOtherRequests() = runBlocking {
+		val ownerId = database.userDao().insert(
+			UserEntity(username = "Owner", email = "owner-accept@test.local", studentId = "120000001")
+		)
+		val firstSenderId = database.userDao().insert(
+			UserEntity(username = "First", email = "first-request@test.local", studentId = "120000002")
+		)
+		val secondSenderId = database.userDao().insert(
+			UserEntity(username = "Second", email = "second-request@test.local", studentId = "120000003")
+		)
+		val foundId = repository.addFoundItem(
+			FoundItemEntity(
+				title = "Wallet",
+				description = "Wallet near the library",
+				location = "Library",
+				category = "Wallet",
+				imageName = "sample_backpack",
+				postedByUserId = ownerId
+			)
+		)
+		assertEquals(
+			ClaimSubmissionResult.SUCCESS,
+			repository.submitClaim(foundId, firstSenderId, "The wallet contains my card")
+		)
+		assertEquals(
+			ClaimSubmissionResult.SUCCESS,
+			repository.submitClaim(foundId, secondSenderId, "I can identify the wallet")
+		)
+		val firstRequest = database.claimDao().getByClaimantAndItem(firstSenderId, foundId)
+			?: error("Missing first request")
+		val secondRequest = database.claimDao().getByClaimantAndItem(secondSenderId, foundId)
+			?: error("Missing second request")
+
+		assertEquals(ClaimReviewResult.ACCESS_DENIED, repository.acceptClaim(firstRequest.id, secondSenderId))
+		assertEquals(ClaimReviewResult.SUCCESS, repository.acceptClaim(firstRequest.id, ownerId))
+		assertEquals(ClaimStatus.APPROVED, database.claimDao().getById(firstRequest.id)?.status)
+		assertEquals(ClaimStatus.PENDING, database.claimDao().getById(secondRequest.id)?.status)
+		assertEquals(ItemStatus.PENDING_RETURN, repository.getFoundItem(foundId)?.status)
 	}
 
 	@Test
@@ -184,7 +226,7 @@ class LostAndFoundRepositoryTest {
 		val approvedId = database.claimDao().getByClaimantAndItem(claimant1, foundId)?.id ?: error("Missing claim")
 
 		assertEquals(ClaimReviewResult.ACCESS_DENIED, repository.approveClaim(approvedId, adminId))
-		assertEquals(ItemStatus.CLAIMED, repository.getFoundItem(foundId)?.status)
+		assertEquals(ItemStatus.OPEN, repository.getFoundItem(foundId)?.status)
 		assertEquals(ClaimStatus.PENDING, database.claimDao().getById(approvedId)?.status)
 		val rejectedId = database.claimDao().getByClaimantAndItem(claimant2, foundId)?.id ?: error("Missing claim")
 		assertEquals(ClaimStatus.PENDING, database.claimDao().getById(rejectedId)?.status)

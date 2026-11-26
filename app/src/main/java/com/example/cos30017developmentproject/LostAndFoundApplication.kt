@@ -34,16 +34,12 @@ class LostAndFoundApplication : Application() {
 	private val authStateListener = FirebaseAuth.AuthStateListener { auth ->
 		val uid = auth.currentUser?.uid
 		if (uid != observedUid) {
-			val previousUid = observedUid
 			observedUid = uid
 			notificationsJob?.cancel()
 			alertTracker = NotificationAlertTracker()
 			if (uid != null) observeIncomingNotifications()
 			FirebaseMessaging.getInstance().token
 				.addOnSuccessListener { token ->
-					if (previousUid != null && previousUid != uid) {
-						FcmTokenRepository.unregister(previousUid, token)
-					}
 					if (uid != null) FcmTokenRepository.register(uid, token)
 				}
 				.addOnFailureListener { error -> Log.e(TAG, "Unable to retrieve FCM token", error) }
@@ -90,22 +86,32 @@ class LostAndFoundApplication : Application() {
 	}
 
 	private fun showNotification(notification: FirestoreNotification) {
+		showNotification(notification.id, notification.type, notification.title, notification.message)
+	}
+
+	fun showForegroundPush(notificationId: String, type: String, title: String, message: String) {
+		if (alertTracker.markNotified(notificationId)) {
+			showNotification(notificationId, type, title, message)
+		}
+	}
+
+	private fun showNotification(notificationId: String, type: String, title: String, body: String) {
 		val activity = currentActivity?.takeUnless { it.isFinishing || it.isDestroyed } ?: return
-		val message = SpannableStringBuilder()
-			.append(notification.title)
+		val displayText = SpannableStringBuilder()
+			.append(title)
 			.append('\n')
-			.append(notification.message)
+			.append(body)
 			.apply {
-				setSpan(StyleSpan(Typeface.BOLD), 0, notification.title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+				setSpan(StyleSpan(Typeface.BOLD), 0, title.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
 			}
 		Snackbar.make(
 			activity.findViewById(android.R.id.content),
-			message,
+			displayText,
 			Snackbar.LENGTH_LONG
 		).setAction(R.string.notifications_open) {
 			applicationScope.launch {
 				try {
-					notificationRepository.markAsRead(notification.id)
+					notificationRepository.markAsRead(notificationId)
 				} catch (error: Exception) {
 					Log.e(TAG, "Unable to mark opened notification as read", error)
 				}
@@ -113,11 +119,11 @@ class LostAndFoundApplication : Application() {
 			activity.startActivity(Intent(activity, MyRequestsActivity::class.java).apply {
 				putExtra(
 					MyRequestsActivity.EXTRA_DIRECTION,
-					if (notification.type == FirestoreNotification.TYPE_CLAIM_REQUEST ||
-						notification.type == FirestoreNotification.TYPE_FOUND_REQUEST
+					if (type == FirestoreNotification.TYPE_CLAIM_REQUEST ||
+						type == FirestoreNotification.TYPE_FOUND_REQUEST
 					) MyRequestsActivity.DIRECTION_RECEIVED else MyRequestsActivity.DIRECTION_SENT
 				)
-				putExtra(MyRequestsActivity.EXTRA_NOTIFICATION_ID, notification.id)
+				putExtra(MyRequestsActivity.EXTRA_NOTIFICATION_ID, notificationId)
 			})
 		}.show()
 	}

@@ -72,8 +72,9 @@ class MyRequestsActivity : AppCompatActivity() {
 		}
 		findViewById<RecyclerView>(R.id.my_requests_list).apply {
 			layoutManager = LinearLayoutManager(this@MyRequestsActivity)
-			adapter = ClaimCardAdapter(::openItemDetails, ::acceptRequest)
-			this@MyRequestsActivity.adapter = adapter
+			val requestAdapter = ClaimCardAdapter(::openItemDetails, ::acceptRequest)
+			adapter = requestAdapter
+			this@MyRequestsActivity.adapter = requestAdapter
 		}
 		findViewById<MaterialButton>(R.id.my_requests_back_to_items).setOnClickListener { backToItems() }
 		findViewById<MaterialButton>(R.id.my_requests_sent).setOnClickListener {
