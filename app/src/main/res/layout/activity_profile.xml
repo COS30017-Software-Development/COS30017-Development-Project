@@ -108,7 +108,7 @@
 					android:layout_height="wrap_content"
 					android:layout_marginTop="12dp"
 					android:minHeight="56dp"
-					android:text="@string/my_claims"
+					android:text="@string/my_requests"
 					android:textAllCaps="false"
 					android:textColor="@color/brand_red_accessible"
 					app:cornerRadius="12dp"

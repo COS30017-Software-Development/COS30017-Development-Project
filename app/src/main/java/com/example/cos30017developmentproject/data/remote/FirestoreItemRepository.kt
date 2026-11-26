@@ -146,6 +146,7 @@ class FirestoreItemRepository(
 		const val TYPE_LOST = "LOST"
 		const val TYPE_FOUND = "FOUND"
 		const val STATUS_OPEN = "OPEN"
+		const val STATUS_PENDING_RETURN = "PENDING_RETURN"
 		private const val ITEMS_COLLECTION = "items"
 		private const val FIELD_ITEM_ID = "itemId"
 		private const val FIELD_ITEM_NAME = "itemName"

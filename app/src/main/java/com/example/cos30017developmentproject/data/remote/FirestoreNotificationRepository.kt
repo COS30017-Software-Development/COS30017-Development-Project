@@ -33,7 +33,8 @@ data class FirestoreNotification(
 ) {
 	companion object {
 		const val TYPE_CLAIM_REQUEST = "CLAIM_REQUEST"
-		const val TYPE_FOUND_SUGGESTION = "FOUND_SUGGESTION"
+		const val TYPE_FOUND_REQUEST = "FOUND_REQUEST"
+		const val TYPE_REQUEST_ACCEPTED = "REQUEST_ACCEPTED"
 	}
 }
 

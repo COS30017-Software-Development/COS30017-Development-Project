@@ -2,6 +2,7 @@
 <manifest xmlns:android = "http://schemas.android.com/apk/res/android"
 	>
 	<uses-permission android:name="android.permission.CAMERA" />
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 	<uses-feature android:name="android.hardware.camera" android:required="false" />
 
 	<application
@@ -25,9 +26,16 @@
 			android:exported = "false"
 			android:windowSoftInputMode = "adjustResize" />
 		<activity
-			android:name = ".MyClaimsActivity"
+			android:name = ".MyRequestsActivity"
 			android:exported = "false"
 			android:windowSoftInputMode = "adjustResize" />
+		<service
+			android:name=".notifications.RequestMessagingService"
+			android:exported="false">
+			<intent-filter>
+				<action android:name="com.google.firebase.MESSAGING_EVENT" />
+			</intent-filter>
+		</service>
 		<activity
 			android:name = ".AdminClaimReviewActivity"
 			android:exported = "false" />

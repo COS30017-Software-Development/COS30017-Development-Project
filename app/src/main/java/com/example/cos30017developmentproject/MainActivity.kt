@@ -1,6 +1,9 @@
 package com.example.cos30017developmentproject
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -8,8 +11,10 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -48,6 +53,10 @@ class MainActivity : AppCompatActivity() {
 	private var unreadCountJob: Job? = null
 	private val firebaseAuth by lazy { FirebaseAuth.getInstance() }
 	private val authStateListener = FirebaseAuth.AuthStateListener { refreshUnreadCount() }
+	private val notificationPermissionLauncher =
+		registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+			if (!granted) Toast.makeText(this, R.string.notification_permission_denied, Toast.LENGTH_LONG).show()
+		}
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -178,7 +187,7 @@ class MainActivity : AppCompatActivity() {
 			} else if (item.itemId == R.id.drawer_my_posts) {
 				openMyPosts()
 			} else if (item.itemId == R.id.drawer_my_claims) {
-				openMyClaims()
+				openMyRequests()
 			} else if (item.itemId == R.id.drawer_notifications) {
 				openNotifications()
 			} else if (item.itemId == R.id.drawer_profile) {
@@ -197,6 +206,27 @@ class MainActivity : AppCompatActivity() {
 		super.onStart()
 		firebaseAuth.addAuthStateListener(authStateListener)
 		refreshUnreadCount()
+		requestNotificationPermissionIfNeeded()
+	}
+
+	private fun requestNotificationPermissionIfNeeded() {
+		if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || firebaseAuth.currentUser == null ||
+			ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+			PackageManager.PERMISSION_GRANTED
+		) return
+		val preferences = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
+		if (!preferences.getBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, false)) {
+			preferences.edit().putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true).apply()
+			notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+		}
+	}
+
+	override fun onNewIntent(intent: Intent) {
+		super.onNewIntent(intent)
+		setIntent(intent)
+		intent.getIntExtra(EXTRA_SELECTED_NAVIGATION, R.id.nav_home)
+			.takeIf { it == R.id.nav_items || it == R.id.nav_home }
+			?.let { bottomNavigation.selectedItemId = it }
 	}
 
 	override fun onStop() {
@@ -259,12 +289,12 @@ class MainActivity : AppCompatActivity() {
 		}
 	}
 
-	private fun openMyClaims() {
+	private fun openMyRequests(direction: String = MyRequestsActivity.DIRECTION_SENT) {
 		bottomNavigation.selectedItemId = R.id.nav_home
 		if (SessionManager(this).userId == null) {
 			startActivity(Intent(this, AuthActivity::class.java))
 		} else {
-			startActivity(Intent(this, MyClaimsActivity::class.java))
+			startActivity(Intent(this, MyRequestsActivity::class.java).putExtra(MyRequestsActivity.EXTRA_DIRECTION, direction))
 		}
 	}
 
@@ -282,17 +312,11 @@ class MainActivity : AppCompatActivity() {
 	}
 
 	private fun openNotificationDetails(notification: FirestoreNotification) {
-		startActivity(Intent(this, ItemDetailsActivity::class.java).apply {
-			putExtra(ItemDetailsActivity.EXTRA_ITEM_ID, notification.itemId)
-			putExtra(
-				ItemDetailsActivity.EXTRA_ITEM_TYPE,
-				if (notification.itemType == FirestoreItemRepository.TYPE_FOUND) {
-					ItemDetailsActivity.TYPE_FOUND
-				} else {
-					ItemDetailsActivity.TYPE_LOST
-				}
-			)
-		})
+		openMyRequests(
+			if (notification.type == FirestoreNotification.TYPE_CLAIM_REQUEST ||
+				notification.type == FirestoreNotification.TYPE_FOUND_REQUEST
+			) MyRequestsActivity.DIRECTION_RECEIVED else MyRequestsActivity.DIRECTION_SENT
+		)
 	}
 
 	private fun refreshUnreadCount() {
@@ -333,6 +357,8 @@ class MainActivity : AppCompatActivity() {
 
 	companion object {
 		const val EXTRA_SELECTED_NAVIGATION = "selected_navigation"
+		private const val PREFERENCES_NAME = "notification_preferences"
+		private const val KEY_NOTIFICATION_PERMISSION_REQUESTED = "permission_requested"
 		private const val TAG = "MainActivity"
 	}
 }

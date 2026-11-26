@@ -49,7 +49,7 @@ class MyPostsActivity : AppCompatActivity() {
 			WindowInsetsCompat.CONSUMED
 		}
 		repository = FirestoreItemRepository()
-		findViewById<MaterialToolbar>(R.id.my_posts_toolbar).setNavigationOnClickListener { finish() }
+		findViewById<MaterialToolbar>(R.id.my_posts_toolbar).setNavigationOnClickListener { backToItems() }
 		adapter = ItemCardAdapter(onItemClick = ::openItemDetails)
 		adapter.setListMode(true)
 		findViewById<RecyclerView>(R.id.my_posts_list).apply {
@@ -59,6 +59,7 @@ class MyPostsActivity : AppCompatActivity() {
 		findViewById<View>(R.id.my_posts_filter_all).setOnClickListener { setFilter(PostFilter.ALL) }
 		findViewById<View>(R.id.my_posts_filter_lost).setOnClickListener { setFilter(PostFilter.LOST) }
 		findViewById<View>(R.id.my_posts_filter_found).setOnClickListener { setFilter(PostFilter.FOUND) }
+		findViewById<View>(R.id.my_posts_back_to_items).setOnClickListener { backToItems() }
 		setFilter(PostFilter.ALL)
 		observePosts()
 	}
@@ -126,6 +127,15 @@ class MyPostsActivity : AppCompatActivity() {
 					ItemDetailsActivity.EXTRA_ITEM_TYPE,
 					if (item.isFound) ItemDetailsActivity.TYPE_FOUND else ItemDetailsActivity.TYPE_LOST
 				)
+			}
+
+			private fun backToItems() {
+				startActivity(
+					Intent(this, MainActivity::class.java)
+						.putExtra(MainActivity.EXTRA_SELECTED_NAVIGATION, R.id.nav_items)
+						.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+				)
+				finish()
 			}
 		)
 	}

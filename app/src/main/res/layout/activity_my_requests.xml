@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:id="@+id/my_requests_root"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent"
+	android:background="@color/surface_soft"
+	android:orientation="vertical">
+
+	<com.google.android.material.appbar.MaterialToolbar
+		android:id="@+id/my_requests_toolbar"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:background="@color/white"
+		android:minHeight="56dp"
+		app:navigationIcon="@drawable/ic_back"
+		app:navigationContentDescription="@string/back_to_items"
+		app:title="@string/my_requests_title"
+		app:titleTextColor="@color/black" />
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:background="@color/white"
+		android:orientation="horizontal"
+		android:paddingHorizontal="16dp"
+		android:paddingBottom="8dp">
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/my_requests_sent"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:text="@string/requests_sent"
+			android:textAllCaps="false"
+			android:textColor="@color/white"
+			app:backgroundTint="@color/brand_red_accessible"
+			app:cornerRadius="12dp" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/my_requests_received"
+			style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="8dp"
+			android:layout_weight="1"
+			android:text="@string/requests_received"
+			android:textAllCaps="false"
+			android:textColor="@color/brand_red_accessible"
+			app:cornerRadius="12dp"
+			app:strokeColor="@color/brand_red_accessible" />
+	</LinearLayout>
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:background="@color/white"
+		android:orientation="horizontal"
+		android:paddingHorizontal="16dp"
+		android:paddingBottom="12dp">
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/my_requests_filter_all"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_weight="1"
+			android:text="@string/filter_all"
+			android:textAllCaps="false"
+			android:textColor="@color/white"
+			app:backgroundTint="@color/brand_red_accessible"
+			app:cornerRadius="12dp" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/my_requests_filter_claim"
+			style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="8dp"
+			android:layout_weight="1"
+			android:text="@string/claim_request"
+			android:textAllCaps="false"
+			android:textColor="@color/brand_red_accessible"
+			app:cornerRadius="12dp"
+			app:strokeColor="@color/brand_red_accessible" />
+
+		<com.google.android.material.button.MaterialButton
+			android:id="@+id/my_requests_filter_found"
+			style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+			android:layout_width="0dp"
+			android:layout_height="wrap_content"
+			android:layout_marginStart="8dp"
+			android:layout_weight="1"
+			android:text="@string/found_request"
+			android:textAllCaps="false"
+			android:textColor="@color/brand_red_accessible"
+			app:cornerRadius="12dp"
+			app:strokeColor="@color/brand_red_accessible" />
+	</LinearLayout>
+
+	<FrameLayout
+		android:layout_width="match_parent"
+		android:layout_height="0dp"
+		android:layout_weight="1">
+
+		<androidx.recyclerview.widget.RecyclerView
+			android:id="@+id/my_requests_list"
+			android:layout_width="match_parent"
+			android:layout_height="match_parent"
+			android:clipToPadding="false"
+			android:padding="14dp" />
+
+		<TextView
+			android:id="@+id/my_requests_empty"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:layout_gravity="center"
+			android:gravity="center"
+			android:padding="24dp"
+			android:text="@string/my_requests_empty"
+			android:textColor="@color/text_secondary"
+			android:textSize="14sp"
+			android:visibility="gone" />
+	</FrameLayout>
+
+	<com.google.android.material.button.MaterialButton
+		android:id="@+id/my_requests_back_to_items"
+		style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginHorizontal="16dp"
+		android:layout_marginVertical="8dp"
+		android:text="@string/back_to_items"
+		android:textAllCaps="false"
+		android:textColor="@color/brand_red_accessible"
+		app:cornerRadius="12dp"
+		app:strokeColor="@color/brand_red_accessible" />
+</LinearLayout>

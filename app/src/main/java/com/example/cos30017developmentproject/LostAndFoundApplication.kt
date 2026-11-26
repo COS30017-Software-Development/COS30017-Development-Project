@@ -12,11 +12,11 @@ import android.text.style.StyleSpan
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.remote.FirestoreNotification
 import com.example.cos30017developmentproject.data.remote.FirestoreNotificationRepository
-import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
-import com.example.cos30017developmentproject.ItemDetailsActivity
+import com.example.cos30017developmentproject.data.remote.FcmTokenRepository
 import com.example.cos30017developmentproject.ui.notifications.NotificationAlertTracker
 import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,10 +34,19 @@ class LostAndFoundApplication : Application() {
 	private val authStateListener = FirebaseAuth.AuthStateListener { auth ->
 		val uid = auth.currentUser?.uid
 		if (uid != observedUid) {
+			val previousUid = observedUid
 			observedUid = uid
 			notificationsJob?.cancel()
 			alertTracker = NotificationAlertTracker()
 			if (uid != null) observeIncomingNotifications()
+			FirebaseMessaging.getInstance().token
+				.addOnSuccessListener { token ->
+					if (previousUid != null && previousUid != uid) {
+						FcmTokenRepository.unregister(previousUid, token)
+					}
+					if (uid != null) FcmTokenRepository.register(uid, token)
+				}
+				.addOnFailureListener { error -> Log.e(TAG, "Unable to retrieve FCM token", error) }
 		}
 	}
 
@@ -50,9 +59,13 @@ class LostAndFoundApplication : Application() {
 			override fun onActivityStarted(activity: Activity) = Unit
 			override fun onActivityResumed(activity: Activity) {
 				currentActivity = activity
+				isInForeground = true
 			}
 			override fun onActivityPaused(activity: Activity) {
-				if (currentActivity === activity) currentActivity = null
+				if (currentActivity === activity) {
+					currentActivity = null
+					isInForeground = false
+				}
 			}
 			override fun onActivityStopped(activity: Activity) = Unit
 			override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
@@ -97,21 +110,23 @@ class LostAndFoundApplication : Application() {
 					Log.e(TAG, "Unable to mark opened notification as read", error)
 				}
 			}
-			activity.startActivity(Intent(activity, ItemDetailsActivity::class.java).apply {
-				putExtra(ItemDetailsActivity.EXTRA_ITEM_ID, notification.itemId)
+			activity.startActivity(Intent(activity, MyRequestsActivity::class.java).apply {
 				putExtra(
-					ItemDetailsActivity.EXTRA_ITEM_TYPE,
-					if (notification.itemType == FirestoreItemRepository.TYPE_FOUND) {
-						ItemDetailsActivity.TYPE_FOUND
-					} else {
-						ItemDetailsActivity.TYPE_LOST
-					}
+					MyRequestsActivity.EXTRA_DIRECTION,
+					if (notification.type == FirestoreNotification.TYPE_CLAIM_REQUEST ||
+						notification.type == FirestoreNotification.TYPE_FOUND_REQUEST
+					) MyRequestsActivity.DIRECTION_RECEIVED else MyRequestsActivity.DIRECTION_SENT
 				)
+				putExtra(MyRequestsActivity.EXTRA_NOTIFICATION_ID, notification.id)
 			})
 		}.show()
 	}
 
-	private companion object {
+	companion object {
 		const val TAG = "LostAndFoundApplication"
+
+		@Volatile
+		var isInForeground: Boolean = false
+			private set
 	}
 }

@@ -77,7 +77,7 @@ class ProfileActivity : AppCompatActivity() {
 			startActivity(Intent(this, MyPostsActivity::class.java))
 		}
 		findViewById<View>(R.id.profile_my_claims).setOnClickListener {
-			startActivity(Intent(this, MyClaimsActivity::class.java))
+			startActivity(Intent(this, MyRequestsActivity::class.java))
 		}
 		findViewById<View>(R.id.profile_logout).setOnClickListener {
 			sessionManager.logout()
@@ -108,7 +108,7 @@ class ProfileActivity : AppCompatActivity() {
 				R.id.drawer_items -> openMain(R.id.nav_items)
 				R.id.drawer_post -> openPost()
 				R.id.drawer_my_posts -> startActivity(Intent(this, MyPostsActivity::class.java))
-				R.id.drawer_my_claims -> startActivity(Intent(this, MyClaimsActivity::class.java))
+				R.id.drawer_my_claims -> startActivity(Intent(this, MyRequestsActivity::class.java))
 				else -> showPreviewMessage(item.title.toString())
 			}
 			false

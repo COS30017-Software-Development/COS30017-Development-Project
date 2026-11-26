@@ -5,151 +5,95 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner() {
-      return signedIn() && resource.data.postedBy == request.auth.uid;
-    }
-
     function isAdmin() {
       return signedIn() && request.auth.token.get('role', '') == 'ADMIN';
-    }
-
-    function claimPath(studentId, itemId) {
-      return /databases/$(database)/documents/claims/$(studentId + '_' + itemId);
     }
 
     function itemPath(itemId) {
       return /databases/$(database)/documents/items/$(itemId);
     }
 
-    function claimDocumentPath(claimId) {
+    function claimPath(claimId) {
       return /databases/$(database)/documents/claims/$(claimId);
-    }
-
-    function foundSuggestionPath(suggestionId) {
-      return /databases/$(database)/documents/foundSuggestions/$(suggestionId);
     }
 
     function notificationPath(notificationId) {
       return /databases/$(database)/documents/notifications/$(notificationId);
     }
 
-    function pendingClaimCount(data) {
-      return data.get('pendingClaimCount', 0);
-    }
-
-    function validAdminReview(itemId) {
-      let claimId = request.resource.data.get('lastReviewedClaimId', '');
-      let claimBefore = get(claimDocumentPath(claimId)).data;
-      let claimAfter = getAfter(claimDocumentPath(claimId)).data;
-      let nextCount = pendingClaimCount(request.resource.data);
-      let currentCount = pendingClaimCount(resource.data);
-      return isAdmin()
-        && claimId is string
-        && exists(claimDocumentPath(claimId))
-        && existsAfter(claimDocumentPath(claimId))
-        && claimBefore.itemId == itemId
-        && claimBefore.status == 'PENDING'
-        && claimAfter.itemId == itemId
-        && claimAfter.status in ['APPROVED', 'REJECTED']
-        && claimAfter.diff(claimBefore).affectedKeys().hasOnly(['status'])
-        && nextCount == currentCount - 1
-        && (
-          (claimAfter.status == 'APPROVED'
-            && resource.data.status in ['OPEN', 'CLAIMED']
-            && request.resource.data.status == 'CLOSED')
-          || (claimAfter.status == 'REJECTED'
-            && (
-              (resource.data.status == 'CLOSED'
-                && request.resource.data.status == 'CLOSED')
-              || (resource.data.status in ['OPEN', 'CLAIMED']
-                && request.resource.data.status
-                  == (nextCount > 0 ? 'CLAIMED' : 'OPEN'))
-            ))
-        );
+    function validItem(data) {
+      return data.keys().hasAll([
+          'itemId', 'itemName', 'description', 'category', 'location',
+          'date', 'type', 'imageUrl', 'imageName', 'status', 'postedBy'
+        ])
+        && data.keys().hasOnly([
+          'itemId', 'itemName', 'description', 'category', 'location',
+          'date', 'type', 'imageUrl', 'imageName', 'status', 'postedBy',
+          'pendingClaimCount', 'lastReviewedClaimId', 'lastAcceptedRequestId'
+        ])
+        && data.itemId is string
+        && data.itemName is string && data.itemName.size() > 0 && data.itemName.size() <= 100
+        && data.description is string && data.description.size() > 0 && data.description.size() <= 1000
+        && data.category is string && data.category.size() > 0 && data.category.size() <= 50
+        && data.location is string && data.location.size() > 0 && data.location.size() <= 100
+        && data.date is timestamp
+        && data.type in ['LOST', 'FOUND']
+        && (data.imageUrl == null || data.imageUrl is string)
+        && data.imageName is string && data.imageName.size() > 0 && data.imageName.size() <= 100
+        && data.status in ['OPEN', 'CLAIMED', 'PENDING_RETURN', 'CLOSED']
+        && (!data.keys().hasAny(['pendingClaimCount'])
+          || (data.pendingClaimCount is int && data.pendingClaimCount >= 0))
+        && (!data.keys().hasAny(['lastReviewedClaimId'])
+          || data.lastReviewedClaimId is string)
+        && (!data.keys().hasAny(['lastAcceptedRequestId'])
+          || data.lastAcceptedRequestId is string)
+        && data.postedBy is string;
     }
 
     function validClaim(data, claimId) {
       return data.keys().hasAll([
-          'claimId', 'itemId', 'studentId', 'description', 'status', 'submittedAt',
-          'itemTitle', 'itemLocation', 'studentName', 'studentEmail', 'studentNumber'
+          'claimId', 'itemId', 'itemType', 'studentId', 'ownerUid', 'description',
+          'status', 'submittedAt', 'itemTitle', 'itemLocation',
+          'studentName', 'studentEmail', 'studentNumber', 'notificationId'
         ])
         && data.keys().hasOnly([
-          'claimId', 'notificationId', 'itemId', 'studentId', 'description', 'status', 'submittedAt',
-          'itemTitle', 'itemLocation', 'studentName', 'studentEmail', 'studentNumber'
+          'claimId', 'itemId', 'itemType', 'studentId', 'ownerUid', 'description',
+          'status', 'submittedAt', 'itemTitle', 'itemLocation',
+          'studentName', 'studentEmail', 'studentNumber', 'notificationId'
         ])
         && data.claimId == claimId
-        && (!data.keys().hasAny(['notificationId']) || data.notificationId is string)
+        && data.claimId == data.studentId + '_' + data.itemId
         && data.itemId is string
+        && data.itemType in ['FOUND', 'LOST']
         && data.studentId is string
-        && claimId == data.studentId + '_' + data.itemId
+        && data.ownerUid is string
         && data.description is string
         && data.description.size() >= 10 && data.description.size() <= 500
-        && data.status in ['PENDING', 'APPROVED', 'REJECTED']
+        && data.status in ['Pending', 'Accepted', 'Rejected', 'PENDING', 'APPROVED', 'REJECTED']
         && data.submittedAt is timestamp
         && data.itemTitle is string && data.itemTitle.size() > 0 && data.itemTitle.size() <= 100
         && data.itemLocation is string && data.itemLocation.size() > 0 && data.itemLocation.size() <= 100
         && data.studentName is string && data.studentName.size() <= 100
         && data.studentEmail is string && data.studentEmail.size() <= 254
-        && data.studentNumber is string && data.studentNumber.size() <= 50;
+        && data.studentNumber is string && data.studentNumber.size() <= 50
+        && data.notificationId is string;
     }
 
-    function validClaimNotificationLink(data, claimId) {
-      return data.notificationId is string
-        && existsAfter(notificationPath(data.notificationId))
-        && getAfter(notificationPath(data.notificationId)).data.type == 'CLAIM_REQUEST'
-        && getAfter(notificationPath(data.notificationId)).data.relatedRequestId == claimId
-        && getAfter(notificationPath(data.notificationId)).data.senderUid == request.auth.uid;
+    function validNewRequestNotificationLink(data, claimId) {
+      let note = getAfter(notificationPath(data.notificationId)).data;
+      return existsAfter(notificationPath(data.notificationId))
+        && note.relatedRequestId == claimId
+        && note.senderUid == request.auth.uid
+        && note.type == (data.itemType == 'FOUND' ? 'CLAIM_REQUEST' : 'FOUND_REQUEST');
     }
 
-    function validSuggestionNotificationLink(data, suggestionId) {
-      return data.notificationId is string
-        && existsAfter(notificationPath(data.notificationId))
-        && getAfter(notificationPath(data.notificationId)).data.type == 'FOUND_SUGGESTION'
-        && getAfter(notificationPath(data.notificationId)).data.relatedRequestId == suggestionId
-        && getAfter(notificationPath(data.notificationId)).data.senderUid == request.auth.uid;
-    }
-
-    function validFoundSuggestion(data, suggestionId) {
-      return signedIn()
-        && data.keys().hasAll([
-          'suggestionId', 'notificationId', 'senderUid', 'senderName', 'recipientUid',
-          'foundItemId', 'foundItemTitle', 'foundItemLocation',
-          'lostItemId', 'lostItemTitle', 'lostItemLocation', 'submittedAt'
-        ])
-        && data.keys().hasOnly([
-          'suggestionId', 'notificationId', 'senderUid', 'senderName', 'recipientUid',
-          'foundItemId', 'foundItemTitle', 'foundItemLocation',
-          'lostItemId', 'lostItemTitle', 'lostItemLocation', 'submittedAt'
-        ])
-        && data.suggestionId == suggestionId
-        && data.senderUid == request.auth.uid
-        && data.senderName is string && data.senderName.size() <= 100
-        && data.recipientUid is string
-        && data.foundItemId is string
-        && data.lostItemId is string
-        && data.notificationId is string
-        && suggestionId == data.senderUid + '_' + data.foundItemId + '_' + data.lostItemId
-        && data.submittedAt is timestamp
-        && exists(itemPath(data.foundItemId))
-        && exists(itemPath(data.lostItemId))
-        && get(itemPath(data.foundItemId)).data.type == 'FOUND'
-        && get(itemPath(data.foundItemId)).data.status != 'CLOSED'
-        && get(itemPath(data.foundItemId)).data.itemName == data.foundItemTitle
-        && get(itemPath(data.foundItemId)).data.location == data.foundItemLocation
-        && get(itemPath(data.lostItemId)).data.type == 'LOST'
-        && get(itemPath(data.lostItemId)).data.status == 'OPEN'
-        && get(itemPath(data.lostItemId)).data.postedBy == data.recipientUid
-        && data.recipientUid != request.auth.uid
-        && get(itemPath(data.lostItemId)).data.itemName == data.lostItemTitle
-        && get(itemPath(data.lostItemId)).data.location == data.lostItemLocation
-        && validSuggestionNotificationLink(data, suggestionId);
-    }
-
-    function validClaimNotification(data, notificationId, item) {
-      let requestPath = claimDocumentPath(data.relatedRequestId);
+    function validRequestNotification(data, notificationId, item) {
+      let requestPath = claimPath(data.relatedRequestId);
       let requestAfter = getAfter(requestPath).data;
-      return data.type == 'CLAIM_REQUEST'
-        && data.itemType == 'FOUND'
+      let requestBefore = get(requestPath).data;
+      let expectedType = item.type == 'FOUND' ? 'CLAIM_REQUEST' : 'FOUND_REQUEST';
+      return data.type == expectedType
+        && data.itemType == item.type
         && data.itemTitle == item.itemName
         && data.itemLocation == item.location
         && data.relatedItemId == null
@@ -158,57 +102,45 @@ service cloud.firestore {
         && data.relatedItemLocation == null
         && data.recipientUid == item.postedBy
         && data.senderUid != item.postedBy
-        && data.title == 'New claim request'
+        && data.title == (expectedType == 'CLAIM_REQUEST' ? 'New claim request' : 'New found request')
         && data.message
           == (data.senderName.size() > 0 ? data.senderName : 'A student')
-            + ' submitted a claim for "' + item.itemName + '".'
+            + ' sent a request for "' + item.itemName + '".'
         && existsAfter(requestPath)
         && requestAfter.claimId == data.relatedRequestId
         && requestAfter.notificationId == notificationId
         && requestAfter.studentId == data.senderUid
+        && requestAfter.ownerUid == item.postedBy
+        && requestAfter.itemType == item.type
         && requestAfter.studentName == data.senderName
         && requestAfter.itemId == data.itemId
         && requestAfter.itemTitle == data.itemTitle
         && requestAfter.itemLocation == data.itemLocation
-        && requestAfter.status == 'PENDING'
+        && requestAfter.status == 'Pending'
         && requestAfter.submittedAt == data.createdAt
-        && (!exists(requestPath) || get(requestPath).data.status == 'REJECTED')
-        && getAfter(itemPath(data.itemId)).data.status == 'CLAIMED';
+        && (!exists(requestPath) || requestBefore.status == 'Rejected' || requestBefore.status == 'REJECTED');
     }
 
-    function validFoundSuggestionNotification(data, notificationId, item) {
-      let suggestionPath = foundSuggestionPath(data.relatedRequestId);
-      let suggestionAfter = getAfter(suggestionPath).data;
-      return data.type == 'FOUND_SUGGESTION'
-        && data.itemType == 'LOST'
+    function validAcceptanceNotification(data, notificationId, item) {
+      let requestPath = claimPath(data.relatedRequestId);
+      let requestAfter = getAfter(requestPath).data;
+      return data.type == 'REQUEST_ACCEPTED'
+        && data.itemType == item.type
         && data.itemTitle == item.itemName
         && data.itemLocation == item.location
-        && data.relatedItemId is string
-        && data.relatedItemType == 'FOUND'
-        && data.recipientUid == item.postedBy
-        && data.senderUid != item.postedBy
-        && exists(itemPath(data.relatedItemId))
-        && data.relatedItemTitle == get(itemPath(data.relatedItemId)).data.itemName
-        && data.relatedItemLocation == get(itemPath(data.relatedItemId)).data.location
-        && get(itemPath(data.relatedItemId)).data.type == 'FOUND'
-        && data.title == 'Found item suggestion'
-        && data.message
-          == (data.senderName.size() > 0 ? data.senderName : 'A student')
-            + ' suggested "' + data.relatedItemTitle + '" for "' + item.itemName + '".'
-        && existsAfter(suggestionPath)
-        && suggestionAfter.suggestionId == data.relatedRequestId
-        && suggestionAfter.notificationId == notificationId
-        && suggestionAfter.senderUid == data.senderUid
-        && suggestionAfter.senderName == data.senderName
-        && suggestionAfter.recipientUid == data.recipientUid
-        && suggestionAfter.lostItemId == data.itemId
-        && suggestionAfter.lostItemTitle == data.itemTitle
-        && suggestionAfter.lostItemLocation == data.itemLocation
-        && suggestionAfter.foundItemId == data.relatedItemId
-        && suggestionAfter.foundItemTitle == data.relatedItemTitle
-        && suggestionAfter.foundItemLocation == data.relatedItemLocation
-        && suggestionAfter.submittedAt == data.createdAt
-        && !exists(suggestionPath);
+        && data.relatedItemId == null
+        && data.relatedItemType == null
+        && data.relatedItemTitle == null
+        && data.relatedItemLocation == null
+        && data.senderUid == item.postedBy
+        && data.recipientUid == requestAfter.studentId
+        && data.title == 'Request accepted'
+        && data.message == 'Your request for "' + item.itemName + '" was accepted.'
+        && existsAfter(requestPath)
+        && requestAfter.status == 'Accepted'
+        && requestAfter.itemId == data.itemId
+        && requestAfter.ownerUid == item.postedBy
+        && requestAfter.itemType == item.type;
     }
 
     function validNotification(data, notificationId) {
@@ -228,7 +160,7 @@ service cloud.firestore {
         && data.recipientUid is string
         && data.senderUid == request.auth.uid
         && data.senderName is string && data.senderName.size() <= 100
-        && data.type in ['CLAIM_REQUEST', 'FOUND_SUGGESTION']
+        && data.type in ['CLAIM_REQUEST', 'FOUND_REQUEST', 'REQUEST_ACCEPTED']
         && data.relatedRequestId is string
         && data.itemId is string
         && data.itemType in ['FOUND', 'LOST']
@@ -240,68 +172,34 @@ service cloud.firestore {
         && data.isRead == false
         && exists(itemPath(data.itemId))
         && (
-          (data.type == 'CLAIM_REQUEST'
-            && data.relatedItemId == null
-            && data.relatedItemType == null
-            && data.relatedItemTitle == null
-            && data.relatedItemLocation == null
-            && validClaimNotification(data, notificationId, get(itemPath(data.itemId)).data))
-          || (data.type == 'FOUND_SUGGESTION'
-            && data.relatedItemId is string
-            && data.relatedItemType == 'FOUND'
-            && data.relatedItemTitle is string
-            && data.relatedItemLocation is string
-            && validFoundSuggestionNotification(data, notificationId, get(itemPath(data.itemId)).data))
+          ((data.type == 'CLAIM_REQUEST' || data.type == 'FOUND_REQUEST')
+            && validRequestNotification(data, notificationId, get(itemPath(data.itemId)).data))
+          || (data.type == 'REQUEST_ACCEPTED'
+            && validAcceptanceNotification(data, notificationId, get(itemPath(data.itemId)).data))
         );
     }
 
-    function validClaimantUpdate(itemId) {
-      let claim = getAfter(claimPath(request.auth.uid, itemId)).data;
-      let existingClaim = get(claimPath(request.auth.uid, itemId)).data;
+    function validRequestItemUpdate(itemId) {
+      let requestId = request.resource.data.get('lastAcceptedRequestId', '');
+      let requestPath = claimPath(requestId);
+      let requestBefore = get(requestPath).data;
+      let requestAfter = getAfter(requestPath).data;
       return signedIn()
-        && request.resource.data.status == 'CLAIMED'
-        && request.resource.data.type == 'FOUND'
-        && resource.data.type == 'FOUND'
-        && resource.data.postedBy != request.auth.uid
-        && resource.data.status in ['OPEN', 'CLAIMED']
+        && (resource.data.postedBy == request.auth.uid || isAdmin())
+        && requestId is string
+        && exists(requestPath)
+        && existsAfter(requestPath)
+        && requestBefore.itemId == itemId
+        && requestBefore.status in ['Pending', 'PENDING']
+        && requestAfter.status == 'Accepted'
+        && requestAfter.ownerUid == resource.data.postedBy
+        && requestAfter.itemId == itemId
+        && request.resource.data.status == 'PENDING_RETURN'
+        && resource.data.status in ['OPEN', 'CLAIMED', 'PENDING_RETURN']
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'pendingClaimCount'])
-        && existsAfter(claimPath(request.auth.uid, itemId))
-        && claim.studentId == request.auth.uid
-        && claim.itemId == itemId
-        && claim.status == 'PENDING'
-        && (!exists(claimPath(request.auth.uid, itemId))
-          || existingClaim.status == 'REJECTED')
-        && request.resource.data.pendingClaimCount is int
-        && pendingClaimCount(getAfter(itemPath(itemId)).data)
-          == pendingClaimCount(get(itemPath(itemId)).data) + 1;
-    }
-
-    function validItem(data) {
-      return data.keys().hasAll([
-          'itemId', 'itemName', 'description', 'category', 'location',
-          'date', 'type', 'imageUrl', 'imageName', 'status', 'postedBy'
-        ])
-        && data.keys().hasOnly([
-          'itemId', 'itemName', 'description', 'category', 'location',
-          'date', 'type', 'imageUrl', 'imageName', 'status', 'postedBy',
-          'pendingClaimCount', 'lastReviewedClaimId'
-        ])
-        && data.itemId is string
-        && data.itemName is string && data.itemName.size() > 0 && data.itemName.size() <= 100
-        && data.description is string && data.description.size() > 0 && data.description.size() <= 1000
-        && data.category is string && data.category.size() > 0 && data.category.size() <= 50
-        && data.location is string && data.location.size() > 0 && data.location.size() <= 100
-        && data.date is timestamp
-        && data.type in ['LOST', 'FOUND']
-        && (data.imageUrl == null || data.imageUrl is string)
-        && data.imageName is string && data.imageName.size() > 0 && data.imageName.size() <= 100
-        && data.status in ['OPEN', 'CLAIMED', 'CLOSED']
-        && (!data.keys().hasAny(['pendingClaimCount'])
-          || (data.pendingClaimCount is int && data.pendingClaimCount >= 0))
-        && (!data.keys().hasAny(['lastReviewedClaimId'])
-          || data.lastReviewedClaimId is string)
-        && data.postedBy is string;
+          .hasOnly(['status', 'lastAcceptedRequestId'])
+        && request.resource.data.postedBy == resource.data.postedBy
+        && request.resource.data.itemId == resource.data.itemId;
     }
 
     match /items/{itemId} {
@@ -311,9 +209,10 @@ service cloud.firestore {
         && request.resource.data.itemId == itemId
         && request.resource.data.postedBy == request.auth.uid
         && request.resource.data.pendingClaimCount == 0
-        && !request.resource.data.keys().hasAny(['lastReviewedClaimId'])
         && request.resource.data.status == 'OPEN';
-      allow update: if isOwner()
+      allow update: if (
+        signedIn()
+        && resource.data.postedBy == request.auth.uid
         && validItem(request.resource.data)
         && request.resource.data.itemId == resource.data.itemId
         && request.resource.data.postedBy == resource.data.postedBy
@@ -323,108 +222,72 @@ service cloud.firestore {
         && request.resource.data.status == resource.data.status
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['itemName', 'description', 'category', 'location', 'imageName'])
-        || (validItem(request.resource.data)
-          && request.resource.data.itemId == resource.data.itemId
-          && request.resource.data.postedBy == resource.data.postedBy
-          && request.resource.data.date == resource.data.date
-          && request.resource.data.type == resource.data.type
-          && request.resource.data.imageUrl == resource.data.imageUrl
-          && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'pendingClaimCount', 'lastReviewedClaimId'])
-          && validAdminReview(itemId))
-        || validClaimantUpdate(itemId);
-      allow delete: if (isOwner() || isAdmin())
-        && resource.data.get('pendingClaimCount', -1) == 0;
+      ) || validRequestItemUpdate(itemId);
+      allow delete: if signedIn()
+        && (resource.data.postedBy == request.auth.uid || isAdmin())
+        && resource.data.get('pendingClaimCount', 0) == 0;
     }
 
     match /claims/{claimId} {
       allow get: if signedIn()
         && (isAdmin()
-          || (!exists(claimDocumentPath(claimId))
+          || (!exists(claimPath(claimId))
             && claimId.matches('^' + request.auth.uid + '_[A-Za-z0-9]+$'))
-          || resource.data.studentId == request.auth.uid);
+          || resource.data.studentId == request.auth.uid
+          || resource.data.ownerUid == request.auth.uid);
       allow list: if signedIn()
-        && (isAdmin() || resource.data.studentId == request.auth.uid);
+        && (isAdmin()
+          || resource.data.studentId == request.auth.uid
+          || resource.data.ownerUid == request.auth.uid);
       allow create: if signedIn()
         && validClaim(request.resource.data, claimId)
-        && validClaimNotificationLink(request.resource.data, claimId)
+        && validNewRequestNotificationLink(request.resource.data, claimId)
         && request.resource.data.studentId == request.auth.uid
-        && request.resource.data.status == 'PENDING'
+        && request.resource.data.status == 'Pending'
+        && request.resource.data.ownerUid != request.auth.uid
         && exists(itemPath(request.resource.data.itemId))
-        && get(itemPath(request.resource.data.itemId)).data.type == 'FOUND'
-        && get(itemPath(request.resource.data.itemId)).data.postedBy != request.auth.uid
-        && get(itemPath(request.resource.data.itemId)).data.status in ['OPEN', 'CLAIMED']
+        && get(itemPath(request.resource.data.itemId)).data.type == request.resource.data.itemType
+        && get(itemPath(request.resource.data.itemId)).data.postedBy == request.resource.data.ownerUid
+        && get(itemPath(request.resource.data.itemId)).data.status != 'CLOSED'
         && get(itemPath(request.resource.data.itemId)).data.itemName == request.resource.data.itemTitle
         && get(itemPath(request.resource.data.itemId)).data.location == request.resource.data.itemLocation
-        && getAfter(itemPath(request.resource.data.itemId)).data.status == 'CLAIMED'
-        && pendingClaimCount(getAfter(itemPath(request.resource.data.itemId)).data)
-          == pendingClaimCount(get(itemPath(request.resource.data.itemId)).data) + 1;
+        && (!exists(claimPath(claimId))
+          || get(claimPath(claimId)).data.status in ['Rejected', 'REJECTED']);
       allow update: if (
-        isAdmin()
-        && resource.data.status == 'PENDING'
-        && request.resource.data.status in ['APPROVED', 'REJECTED']
+        signedIn()
+        && (resource.data.ownerUid == request.auth.uid || isAdmin())
+        && resource.data.status in ['Pending', 'PENDING']
+        && request.resource.data.status == 'Accepted'
         && validClaim(request.resource.data, claimId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'ownerUid'])
         && exists(itemPath(resource.data.itemId))
-        && getAfter(itemPath(resource.data.itemId)).data.lastReviewedClaimId == claimId
-        && pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data)
-          == pendingClaimCount(get(itemPath(resource.data.itemId)).data) - 1
-        && (
-          (request.resource.data.status == 'APPROVED'
-            && get(itemPath(resource.data.itemId)).data.status in ['OPEN', 'CLAIMED']
-            && getAfter(itemPath(resource.data.itemId)).data.status == 'CLOSED')
-          || (request.resource.data.status == 'REJECTED'
-            && (
-              (get(itemPath(resource.data.itemId)).data.status == 'CLOSED'
-                && getAfter(itemPath(resource.data.itemId)).data.status == 'CLOSED')
-              || (get(itemPath(resource.data.itemId)).data.status in ['OPEN', 'CLAIMED']
-                && getAfter(itemPath(resource.data.itemId)).data.status
-                  == (pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data) > 0
-                    ? 'CLAIMED' : 'OPEN'))
-            ))
-        )
+        && getAfter(itemPath(resource.data.itemId)).data.lastAcceptedRequestId == claimId
+      ) || (
+        isAdmin()
+        && resource.data.status in ['Pending', 'PENDING']
+        && request.resource.data.status == 'Rejected'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
       ) || (
         signedIn()
         && resource.data.studentId == request.auth.uid
-        && resource.data.status == 'REJECTED'
-        && request.resource.data.status == 'PENDING'
+        && resource.data.status in ['Rejected', 'REJECTED']
+        && request.resource.data.status == 'Pending'
         && validClaim(request.resource.data, claimId)
-        && validClaimNotificationLink(request.resource.data, claimId)
+        && validNewRequestNotificationLink(request.resource.data, claimId)
         && request.resource.data.studentId == resource.data.studentId
         && request.resource.data.itemId == resource.data.itemId
         && request.resource.data.claimId == resource.data.claimId
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly([
-            'description', 'status', 'submittedAt', 'itemTitle', 'itemLocation',
-              'studentName', 'studentEmail', 'studentNumber', 'notificationId'
-          ])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'description', 'status', 'submittedAt', 'itemTitle', 'itemLocation',
+          'studentName', 'studentEmail', 'studentNumber', 'notificationId', 'ownerUid', 'itemType'
+        ])
         && exists(itemPath(resource.data.itemId))
-        && get(itemPath(resource.data.itemId)).data.status in ['OPEN', 'CLAIMED']
-        && get(itemPath(resource.data.itemId)).data.itemName == request.resource.data.itemTitle
-        && get(itemPath(resource.data.itemId)).data.location == request.resource.data.itemLocation
-        && getAfter(itemPath(resource.data.itemId)).data.status == 'CLAIMED'
-        && pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data)
-          == pendingClaimCount(get(itemPath(resource.data.itemId)).data) + 1
+        && get(itemPath(resource.data.itemId)).data.postedBy == request.resource.data.ownerUid
+        && get(itemPath(resource.data.itemId)).data.type == request.resource.data.itemType
+        && get(itemPath(resource.data.itemId)).data.status != 'CLOSED'
       );
       allow delete: if false;
-    }
-
-    match /foundSuggestions/{suggestionId} {
-      allow get: if signedIn()
-        && (
-          (!exists(foundSuggestionPath(suggestionId))
-            && suggestionId.matches('^' + request.auth.uid + '_.*$'))
-          || (exists(foundSuggestionPath(suggestionId))
-            && (
-              resource.data.senderUid == request.auth.uid
-              || resource.data.recipientUid == request.auth.uid
-            ))
-        );
-      allow list: if signedIn()
-        && (resource.data.senderUid == request.auth.uid
-          || resource.data.recipientUid == request.auth.uid);
-      allow create: if validFoundSuggestion(request.resource.data, suggestionId);
-      allow update, delete: if false;
     }
 
     match /notifications/{notificationId} {
@@ -436,6 +299,16 @@ service cloud.firestore {
         && request.resource.data.isRead == true
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
       allow delete: if false;
+    }
+
+    match /users/{uid}/fcmTokens/{tokenId} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['token', 'updatedAt'])
+        && request.resource.data.token is string
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if signedIn() && request.auth.uid == uid;
     }
   }
 }

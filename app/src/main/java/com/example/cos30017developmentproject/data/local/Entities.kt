@@ -105,12 +105,13 @@ object UserRole {
 object ItemStatus {
 	const val OPEN = "OPEN"
 	const val CLAIMED = "CLAIMED"
+	const val PENDING_RETURN = "PENDING_RETURN"
 	const val CLOSED = "CLOSED"
 	const val ACTIVE = OPEN
 }
 
 object ClaimStatus {
-	const val PENDING = "PENDING"
-	const val APPROVED = "APPROVED"
-	const val REJECTED = "REJECTED"
+	const val PENDING = "Pending"
+	const val APPROVED = "Accepted"
+	const val REJECTED = "Rejected"
 }

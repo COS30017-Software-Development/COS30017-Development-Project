@@ -61,6 +61,7 @@ dependencies {
 	implementation(libs.firebase.analytics)
 	implementation(libs.firebase.auth)
 	implementation(libs.firebase.firestore)
+	implementation(libs.firebase.messaging)
 	implementation(libs.kotlinx.coroutines.play.services)
 
 	// Add the dependencies for any other desired Firebase products

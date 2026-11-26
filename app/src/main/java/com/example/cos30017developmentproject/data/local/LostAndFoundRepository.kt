@@ -153,7 +153,6 @@ class LostAndFoundRepository(database: AppDatabase) {
 				if (claims.updateStatusIfPending(claimId, ClaimStatus.APPROVED) != 1) {
 					throw IllegalStateException("Claim processing changed concurrently")
 				}
-				claims.rejectOtherPending(item.id, claimId)
 				ClaimReviewResult.SUCCESS
 			}
 		} catch (_: Exception) {

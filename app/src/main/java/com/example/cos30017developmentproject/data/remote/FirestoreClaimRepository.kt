@@ -1,12 +1,11 @@
 package com.example.cos30017developmentproject.data.remote
 
 import com.example.cos30017developmentproject.auth.FirebaseAuthManager
-import com.example.cos30017developmentproject.data.local.ClaimReviewPolicy
+import com.example.cos30017developmentproject.data.local.ClaimDescriptionValidation
+import com.example.cos30017developmentproject.data.local.ClaimReviewResult
 import com.example.cos30017developmentproject.data.local.ClaimStatus
 import com.example.cos30017developmentproject.data.local.ClaimSubmissionResult
-import com.example.cos30017developmentproject.data.local.ClaimReviewResult
 import com.example.cos30017developmentproject.data.local.ClaimValidation
-import com.example.cos30017developmentproject.data.local.ClaimDescriptionValidation
 import com.example.cos30017developmentproject.data.local.ItemStatus
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
@@ -25,6 +24,7 @@ data class FirestoreClaim(
 	val itemId: String,
 	val itemType: String,
 	val studentId: String,
+	val ownerUid: String,
 	val description: String,
 	val status: String,
 	val submittedAt: Long,
@@ -41,6 +41,7 @@ class FirestoreClaimRepository(
 ) {
 	private val claims: CollectionReference = firestore.collection(CLAIMS_COLLECTION)
 	private val items = firestore.collection(ITEMS_COLLECTION)
+	private val notifications = firestore.collection(NOTIFICATIONS_COLLECTION)
 
 	val currentUserUid: String?
 		get() = firebaseAuth.currentUser?.uid
@@ -54,12 +55,18 @@ class FirestoreClaimRepository(
 		return observeClaims(claims.whereEqualTo(FIELD_STUDENT_ID, uid))
 	}
 
+	fun observeIncomingRequests(): Flow<List<FirestoreClaim>> {
+		val uid = currentUserUid
+			?: return callbackFlow { close(IllegalStateException("A Firebase user must be signed in")) }
+		return observeClaims(claims.whereEqualTo(FIELD_OWNER_UID, uid))
+	}
+
 	fun observeAllClaims(): Flow<List<FirestoreClaim>> = observeClaims(claims)
 
 	suspend fun hasPendingClaim(itemId: String): Boolean {
 		val uid = currentUserUid ?: return false
 		val document = claims.document(claimDocumentId(uid, itemId)).get().await()
-		return document.exists() && document.getString(FIELD_STATUS) == ClaimStatus.PENDING
+		return document.exists() && document.getString(FIELD_STATUS).isNotRejected()
 	}
 
 	suspend fun submitClaim(
@@ -79,79 +86,76 @@ class FirestoreClaimRepository(
 
 		val itemReference = items.document(itemId)
 		val claimReference = claims.document(claimDocumentId(uid, itemId))
-		val notificationReference = firestore.collection(NOTIFICATIONS_COLLECTION).document()
+		val notificationReference = notifications.document()
 		return try {
 			firestore.runTransaction { transaction ->
 				val item = transaction.get(itemReference)
 				if (!item.exists()) return@runTransaction ClaimSubmissionResult.ITEM_NOT_FOUND
-				if (item.getString(FIELD_ITEM_TYPE) != FirestoreItemRepository.TYPE_FOUND) {
+				val itemType = item.getString(FIELD_ITEM_TYPE)
+					?: return@runTransaction ClaimSubmissionResult.ITEM_NOT_FOUND
+				if (itemType !in setOf(FirestoreItemRepository.TYPE_FOUND, FirestoreItemRepository.TYPE_LOST)) {
 					return@runTransaction ClaimSubmissionResult.ITEM_NOT_FOUND
 				}
-				if (item.getString(FIELD_POSTED_BY) == uid) {
-					return@runTransaction ClaimSubmissionResult.OWNER_CANNOT_CLAIM
+				val ownerUid = item.getString(FIELD_POSTED_BY)
+					?: return@runTransaction ClaimSubmissionResult.ITEM_NOT_FOUND
+				if (ownerUid == uid) return@runTransaction ClaimSubmissionResult.OWNER_CANNOT_CLAIM
+				if (item.getString(FIELD_STATUS) == ItemStatus.CLOSED) {
+					return@runTransaction ClaimSubmissionResult.ITEM_CLOSED
 				}
-				val itemStatus = item.getString(FIELD_STATUS)
-				if (itemStatus == ItemStatus.CLOSED) return@runTransaction ClaimSubmissionResult.ITEM_CLOSED
-				if (itemStatus != FirestoreItemRepository.STATUS_OPEN && itemStatus != ItemStatus.CLAIMED) {
-					return@runTransaction ClaimSubmissionResult.FAILED
-				}
-				val pendingCount = item.getLong(FIELD_PENDING_CLAIM_COUNT) ?: 0L
-				if (pendingCount < 0L) return@runTransaction ClaimSubmissionResult.FAILED
 
 				val existingClaim = transaction.get(claimReference)
-				if (existingClaim.exists() && existingClaim.getString(FIELD_STATUS) != ClaimStatus.REJECTED) {
+				if (existingClaim.exists() && existingClaim.getString(FIELD_STATUS).isNotRejected()) {
 					return@runTransaction ClaimSubmissionResult.ALREADY_CLAIMED
 				}
-
 				val itemTitle = item.getString(FIELD_ITEM_NAME)
 					?: return@runTransaction ClaimSubmissionResult.ITEM_NOT_FOUND
 				val itemLocation = item.getString(FIELD_ITEM_LOCATION)
 					?: return@runTransaction ClaimSubmissionResult.ITEM_NOT_FOUND
 				val submittedAt = Timestamp.now()
-				val notificationSenderName = studentName.trim().take(MAX_NOTIFICATION_SENDER_NAME_LENGTH)
-				val claimData = mapOf(
+				val senderName = studentName.trim().take(MAX_NOTIFICATION_SENDER_NAME_LENGTH)
+				val requestType = if (itemType == FirestoreItemRepository.TYPE_FOUND) {
+					FirestoreNotification.TYPE_CLAIM_REQUEST
+				} else {
+					FirestoreNotification.TYPE_FOUND_REQUEST
+				}
+				val requestData = mapOf(
 					FIELD_CLAIM_ID to claimReference.id,
 					FIELD_NOTIFICATION_ID to notificationReference.id,
 					FIELD_ITEM_ID to itemId,
+					FIELD_ITEM_TYPE to itemType,
 					FIELD_STUDENT_ID to uid,
+					FIELD_OWNER_UID to ownerUid,
 					FIELD_DESCRIPTION to validatedDescription,
 					FIELD_STATUS to ClaimStatus.PENDING,
 					FIELD_SUBMITTED_AT to submittedAt,
 					FIELD_ITEM_TITLE to itemTitle,
 					FIELD_CLAIM_ITEM_LOCATION to itemLocation,
-					FIELD_STUDENT_NAME to notificationSenderName,
+					FIELD_STUDENT_NAME to senderName,
 					FIELD_STUDENT_EMAIL to studentEmail,
 					FIELD_STUDENT_NUMBER to studentNumber
 				)
-				transaction.set(claimReference, claimData)
-				transaction.update(
-					itemReference,
-					mapOf(
-						FIELD_STATUS to ItemStatus.CLAIMED,
-						FIELD_PENDING_CLAIM_COUNT to pendingCount + 1
-					)
-				)
+				transaction.set(claimReference, requestData)
 				transaction.set(
 					notificationReference,
 					mapOf(
-						FIELD_NOTIFICATION_RECIPIENT_UID to item.getString(FIELD_POSTED_BY),
+						FIELD_NOTIFICATION_RECIPIENT_UID to ownerUid,
 						FIELD_NOTIFICATION_SENDER_UID to uid,
-						FIELD_NOTIFICATION_SENDER_NAME to notificationSenderName,
-						FIELD_NOTIFICATION_TYPE to FirestoreNotification.TYPE_CLAIM_REQUEST,
+						FIELD_NOTIFICATION_SENDER_NAME to senderName,
+						FIELD_NOTIFICATION_TYPE to requestType,
 						FIELD_NOTIFICATION_REQUEST_ID to claimReference.id,
 						FIELD_ITEM_ID to itemId,
-						FIELD_NOTIFICATION_ITEM_TYPE to FirestoreItemRepository.TYPE_FOUND,
+						FIELD_NOTIFICATION_ITEM_TYPE to itemType,
 						FIELD_NOTIFICATION_ITEM_TITLE to itemTitle,
 						FIELD_NOTIFICATION_ITEM_LOCATION to itemLocation,
 						FIELD_NOTIFICATION_RELATED_ITEM_ID to null,
 						FIELD_NOTIFICATION_RELATED_ITEM_TYPE to null,
 						FIELD_NOTIFICATION_RELATED_ITEM_TITLE to null,
 						FIELD_NOTIFICATION_RELATED_ITEM_LOCATION to null,
-						FIELD_NOTIFICATION_TITLE to NOTIFICATION_TITLE,
+						FIELD_NOTIFICATION_TITLE to requestType.notificationTitle(),
 						FIELD_NOTIFICATION_MESSAGE to
-							"${notificationSenderName.ifBlank { "A student" }} submitted a claim for \"$itemTitle\".",
+							"${senderName.ifBlank { "A student" }} sent a request for \"$itemTitle\".",
 						FIELD_NOTIFICATION_CREATED_AT to submittedAt,
-						FIELD_NOTIFICATION_IS_READ to false,
+						FIELD_NOTIFICATION_IS_READ to false
 					)
 				)
 				ClaimSubmissionResult.SUCCESS
@@ -163,39 +167,83 @@ class FirestoreClaimRepository(
 		}
 	}
 
+	suspend fun acceptRequest(claimId: String): ClaimReviewResult =
+		processAcceptance(claimId, requireOwner = true)
+
 	suspend fun approveClaim(claimId: String): ClaimReviewResult {
 		if (!isCurrentUserAdmin()) return ClaimReviewResult.ACCESS_DENIED
+		return processAcceptance(claimId, requireOwner = false)
+	}
+
+	private suspend fun processAcceptance(claimId: String, requireOwner: Boolean): ClaimReviewResult {
+		val uid = currentUserUid ?: return ClaimReviewResult.ACCESS_DENIED
 		val claimReference = claims.document(claimId)
+		val notificationReference = notifications.document()
 		return try {
-			val existingClaim = claimReference.get().await()
-			if (!existingClaim.exists()) return ClaimReviewResult.NOT_FOUND
-			val itemId = existingClaim.getString(FIELD_ITEM_ID)
-				?: return ClaimReviewResult.ITEM_NOT_FOUND
 			firestore.runTransaction { transaction ->
 				val claim = transaction.get(claimReference)
 				if (!claim.exists()) return@runTransaction ClaimReviewResult.NOT_FOUND
-				if (!ClaimReviewPolicy.canProcess(claim.getString(FIELD_STATUS).orEmpty())) {
+				if (!claim.getString(FIELD_STATUS).isPending()) {
 					return@runTransaction ClaimReviewResult.ALREADY_PROCESSED
 				}
-				if (claim.getString(FIELD_ITEM_ID) != itemId) {
-					return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
-				}
+				val itemId = claim.getString(FIELD_ITEM_ID)
+					?: return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
 				val itemReference = items.document(itemId)
 				val item = transaction.get(itemReference)
 				if (!item.exists()) return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
+				val ownerUid = item.getString(FIELD_POSTED_BY)
+					?: return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
+				if (requireOwner && ownerUid != uid) return@runTransaction ClaimReviewResult.ACCESS_DENIED
 				if (item.getString(FIELD_STATUS) == ItemStatus.CLOSED) {
 					return@runTransaction ClaimReviewResult.ITEM_CLOSED
 				}
-				val pendingCount = item.getLong(FIELD_PENDING_CLAIM_COUNT) ?: 0L
-				if (pendingCount <= 0L) return@runTransaction ClaimReviewResult.FAILED
+				val senderUid = claim.getString(FIELD_STUDENT_ID)
+					?: return@runTransaction ClaimReviewResult.NOT_FOUND
+				val itemType = claim.getString(FIELD_ITEM_TYPE)
+					?: item.getString(FIELD_ITEM_TYPE)
+					?: return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
+				val itemTitle = claim.getString(FIELD_ITEM_TITLE)
+					?: item.getString(FIELD_ITEM_NAME)
+					?: return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
+				val itemLocation = claim.getString(FIELD_CLAIM_ITEM_LOCATION)
+					?: item.getString(FIELD_ITEM_LOCATION)
+					?: return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
+				val acceptedAt = Timestamp.now()
 
-				transaction.update(claimReference, FIELD_STATUS, ClaimStatus.APPROVED)
+				transaction.update(
+					claimReference,
+					mapOf(
+						FIELD_STATUS to ClaimStatus.APPROVED,
+						FIELD_OWNER_UID to ownerUid
+					)
+				)
 				transaction.update(
 					itemReference,
 					mapOf(
-						FIELD_STATUS to ClaimReviewPolicy.approvedItemStatus(),
-						FIELD_PENDING_CLAIM_COUNT to pendingCount - 1,
-						FIELD_LAST_REVIEWED_CLAIM_ID to claimId
+						FIELD_STATUS to ItemStatus.PENDING_RETURN,
+						FIELD_LAST_ACCEPTED_REQUEST_ID to claimId
+					)
+				)
+				transaction.set(
+					notificationReference,
+					mapOf(
+						FIELD_NOTIFICATION_RECIPIENT_UID to senderUid,
+						FIELD_NOTIFICATION_SENDER_UID to ownerUid,
+						FIELD_NOTIFICATION_SENDER_NAME to "",
+						FIELD_NOTIFICATION_TYPE to FirestoreNotification.TYPE_REQUEST_ACCEPTED,
+						FIELD_NOTIFICATION_REQUEST_ID to claimId,
+						FIELD_ITEM_ID to itemId,
+						FIELD_NOTIFICATION_ITEM_TYPE to itemType,
+						FIELD_NOTIFICATION_ITEM_TITLE to itemTitle,
+						FIELD_NOTIFICATION_ITEM_LOCATION to itemLocation,
+						FIELD_NOTIFICATION_RELATED_ITEM_ID to null,
+						FIELD_NOTIFICATION_RELATED_ITEM_TYPE to null,
+						FIELD_NOTIFICATION_RELATED_ITEM_TITLE to null,
+						FIELD_NOTIFICATION_RELATED_ITEM_LOCATION to null,
+						FIELD_NOTIFICATION_TITLE to "Request accepted",
+						FIELD_NOTIFICATION_MESSAGE to "Your request for \"$itemTitle\" was accepted.",
+						FIELD_NOTIFICATION_CREATED_AT to acceptedAt,
+						FIELD_NOTIFICATION_IS_READ to false
 					)
 				)
 				ClaimReviewResult.SUCCESS
@@ -211,43 +259,13 @@ class FirestoreClaimRepository(
 		if (!isCurrentUserAdmin()) return ClaimReviewResult.ACCESS_DENIED
 		val claimReference = claims.document(claimId)
 		return try {
-			val existingClaim = claimReference.get().await()
-			if (!existingClaim.exists()) return ClaimReviewResult.NOT_FOUND
-			val itemId = existingClaim.getString(FIELD_ITEM_ID)
-				?: return ClaimReviewResult.ITEM_NOT_FOUND
 			firestore.runTransaction { transaction ->
 				val claim = transaction.get(claimReference)
 				if (!claim.exists()) return@runTransaction ClaimReviewResult.NOT_FOUND
-				if (!ClaimReviewPolicy.canProcess(claim.getString(FIELD_STATUS).orEmpty())) {
+				if (!claim.getString(FIELD_STATUS).isPending()) {
 					return@runTransaction ClaimReviewResult.ALREADY_PROCESSED
 				}
-				if (claim.getString(FIELD_ITEM_ID) != itemId) {
-					return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
-				}
-				val itemReference = items.document(itemId)
-				val item = transaction.get(itemReference)
-				if (!item.exists()) return@runTransaction ClaimReviewResult.ITEM_NOT_FOUND
-				val pendingCount = item.getLong(FIELD_PENDING_CLAIM_COUNT) ?: 0L
-				if (pendingCount <= 0L) return@runTransaction ClaimReviewResult.FAILED
-
-				val remainingPendingCount = pendingCount - 1
-				val itemStatus = item.getString(FIELD_STATUS)
-				val nextItemStatus = if (itemStatus == ItemStatus.CLOSED) {
-					ItemStatus.CLOSED
-				} else if (remainingPendingCount > 0L) {
-					ItemStatus.CLAIMED
-				} else {
-					ItemStatus.OPEN
-				}
 				transaction.update(claimReference, FIELD_STATUS, ClaimStatus.REJECTED)
-				transaction.update(
-					itemReference,
-					mapOf(
-						FIELD_STATUS to nextItemStatus,
-						FIELD_PENDING_CLAIM_COUNT to remainingPendingCount,
-						FIELD_LAST_REVIEWED_CLAIM_ID to claimId
-					)
-				)
 				ClaimReviewResult.SUCCESS
 			}.await()
 		} catch (exception: CancellationException) {
@@ -266,11 +284,13 @@ class FirestoreClaimRepository(
 				if (error != null) {
 					close(error)
 				} else if (snapshot == null) {
-					close(IllegalStateException("Firestore returned an empty claim snapshot"))
+					close(IllegalStateException("Firestore returned an empty request snapshot"))
 				} else {
 					try {
-						trySend(snapshot.documents.mapNotNull { it.toFirestoreClaim() }
-							.sortedByDescending(FirestoreClaim::submittedAt))
+						trySend(
+							snapshot.documents.mapNotNull { it.toFirestoreClaim() }
+								.sortedByDescending(FirestoreClaim::submittedAt)
+						)
 					} catch (exception: Exception) {
 						close(exception)
 					}
@@ -282,40 +302,55 @@ class FirestoreClaimRepository(
 	private fun DocumentSnapshot.toFirestoreClaim(): FirestoreClaim? {
 		if (!exists()) return null
 		val submittedAt = getTimestamp(FIELD_SUBMITTED_AT)
-			?: throw IllegalStateException("Firestore claim is missing its submittedAt timestamp")
+			?: throw IllegalStateException("Firestore request is missing its submittedAt timestamp")
 		return FirestoreClaim(
-			claimId = getString(FIELD_CLAIM_ID)
-				?: throw IllegalStateException("Firestore claim is missing its claimId"),
+			claimId = getString(FIELD_CLAIM_ID) ?: id,
 			itemId = getString(FIELD_ITEM_ID)
-				?: throw IllegalStateException("Firestore claim is missing its itemId"),
-			// Claim creation and Firestore rules currently permit claims only for FOUND items.
-			itemType = FirestoreItemRepository.TYPE_FOUND,
+				?: throw IllegalStateException("Firestore request is missing its itemId"),
+			itemType = getString(FIELD_ITEM_TYPE) ?: FirestoreItemRepository.TYPE_FOUND,
 			studentId = getString(FIELD_STUDENT_ID)
-				?: throw IllegalStateException("Firestore claim is missing its studentId"),
+				?: throw IllegalStateException("Firestore request is missing its studentId"),
+			ownerUid = getString(FIELD_OWNER_UID).orEmpty(),
 			description = getString(FIELD_DESCRIPTION)
-				?: throw IllegalStateException("Firestore claim is missing its description"),
-			status = getString(FIELD_STATUS)
-				?: throw IllegalStateException("Firestore claim is missing its status"),
+				?: throw IllegalStateException("Firestore request is missing its message"),
+			status = getString(FIELD_STATUS).normalizedRequestStatus(),
 			submittedAt = submittedAt.toDate().time,
 			itemTitle = getString(FIELD_ITEM_TITLE)
-				?: throw IllegalStateException("Firestore claim is missing its itemTitle"),
+				?: throw IllegalStateException("Firestore request is missing its itemTitle"),
 			itemLocation = getString(FIELD_CLAIM_ITEM_LOCATION)
-				?: throw IllegalStateException("Firestore claim is missing its itemLocation"),
+				?: throw IllegalStateException("Firestore request is missing its itemLocation"),
 			studentName = getString(FIELD_STUDENT_NAME).orEmpty(),
 			studentEmail = getString(FIELD_STUDENT_EMAIL).orEmpty(),
 			studentNumber = getString(FIELD_STUDENT_NUMBER).orEmpty()
 		)
 	}
 
+	private fun String?.isPending(): Boolean = this == ClaimStatus.PENDING || this == LEGACY_PENDING
+
+	private fun String?.isNotRejected(): Boolean = this != ClaimStatus.REJECTED && this != LEGACY_REJECTED
+
+	private fun String?.normalizedRequestStatus(): String = when (this) {
+		LEGACY_PENDING -> ClaimStatus.PENDING
+		LEGACY_APPROVED -> ClaimStatus.APPROVED
+		LEGACY_REJECTED -> ClaimStatus.REJECTED
+		else -> this ?: ClaimStatus.PENDING
+	}
+
+	private fun String.notificationTitle(): String =
+		if (this == FirestoreNotification.TYPE_CLAIM_REQUEST) "New claim request" else "New found request"
+
 	private fun claimDocumentId(studentUid: String, itemId: String): String = "${studentUid}_$itemId"
 
 	private companion object {
 		const val ITEMS_COLLECTION = "items"
 		const val CLAIMS_COLLECTION = "claims"
+		const val NOTIFICATIONS_COLLECTION = "notifications"
 		const val FIELD_CLAIM_ID = "claimId"
 		const val FIELD_NOTIFICATION_ID = "notificationId"
 		const val FIELD_ITEM_ID = "itemId"
+		const val FIELD_ITEM_TYPE = "itemType"
 		const val FIELD_STUDENT_ID = "studentId"
+		const val FIELD_OWNER_UID = "ownerUid"
 		const val FIELD_DESCRIPTION = "description"
 		const val FIELD_STATUS = "status"
 		const val FIELD_SUBMITTED_AT = "submittedAt"
@@ -324,13 +359,10 @@ class FirestoreClaimRepository(
 		const val FIELD_STUDENT_NAME = "studentName"
 		const val FIELD_STUDENT_EMAIL = "studentEmail"
 		const val FIELD_STUDENT_NUMBER = "studentNumber"
-		const val FIELD_ITEM_TYPE = "type"
 		const val FIELD_POSTED_BY = "postedBy"
 		const val FIELD_ITEM_NAME = "itemName"
 		const val FIELD_ITEM_LOCATION = "location"
-		const val FIELD_PENDING_CLAIM_COUNT = "pendingClaimCount"
-		const val FIELD_LAST_REVIEWED_CLAIM_ID = "lastReviewedClaimId"
-		const val NOTIFICATIONS_COLLECTION = "notifications"
+		const val FIELD_LAST_ACCEPTED_REQUEST_ID = "lastAcceptedRequestId"
 		const val FIELD_NOTIFICATION_RECIPIENT_UID = "recipientUid"
 		const val FIELD_NOTIFICATION_SENDER_UID = "senderUid"
 		const val FIELD_NOTIFICATION_SENDER_NAME = "senderName"
@@ -347,8 +379,9 @@ class FirestoreClaimRepository(
 		const val FIELD_NOTIFICATION_MESSAGE = "message"
 		const val FIELD_NOTIFICATION_CREATED_AT = "createdAt"
 		const val FIELD_NOTIFICATION_IS_READ = "isRead"
-		const val NOTIFICATION_TITLE = "New claim request"
 		const val MAX_NOTIFICATION_SENDER_NAME_LENGTH = 100
+		const val LEGACY_PENDING = "PENDING"
+		const val LEGACY_APPROVED = "APPROVED"
+		const val LEGACY_REJECTED = "REJECTED"
 	}
-
 }

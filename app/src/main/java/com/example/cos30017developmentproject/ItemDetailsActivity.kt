@@ -21,21 +21,16 @@ import com.example.cos30017developmentproject.data.local.ItemStatus
 import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
 import com.example.cos30017developmentproject.data.remote.FirestoreClaimRepository
 import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
-import com.example.cos30017developmentproject.data.remote.FirestoreSuggestionRepository
-import com.example.cos30017developmentproject.data.remote.FoundSuggestionSubmissionResult
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class ItemDetailsActivity : AppCompatActivity() {
 	private lateinit var repository: LostAndFoundRepository
 	private lateinit var firestoreRepository: FirestoreItemRepository
 	private lateinit var firestoreClaimRepository: FirestoreClaimRepository
-	private lateinit var firestoreSuggestionRepository: FirestoreSuggestionRepository
 	private val editItem = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
 		if (result.resultCode == RESULT_OK) {
 			itemIdFromIntent(intent)?.let { loadItem(it, intent.getStringExtra(EXTRA_ITEM_TYPE).orEmpty()) }
@@ -58,7 +53,6 @@ class ItemDetailsActivity : AppCompatActivity() {
 		repository = LostAndFoundRepository(AppDatabase.getInstance(this))
 		firestoreRepository = FirestoreItemRepository()
 		firestoreClaimRepository = FirestoreClaimRepository()
-		firestoreSuggestionRepository = FirestoreSuggestionRepository()
 
 		val id = itemIdFromIntent(intent)
 		val type = intent.getStringExtra(EXTRA_ITEM_TYPE) ?: ""
@@ -162,6 +156,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 			when (item.status) {
 				ItemStatus.CLOSED -> R.string.item_closed
 				ItemStatus.CLAIMED -> R.string.item_claimed
+				ItemStatus.PENDING_RETURN -> R.string.item_pending_return
 				else -> R.string.item_open
 			}
 		)
@@ -173,86 +168,19 @@ class ItemDetailsActivity : AppCompatActivity() {
 		findViewById<View>(R.id.item_owner_actions).isVisible = isCurrentUserOwner(item)
 		findViewById<View>(R.id.edit_item).setOnClickListener { openEdit(item.id, type) }
 		findViewById<View>(R.id.delete_item).setOnClickListener { confirmDelete(item.id, type) }
-		findViewById<View>(R.id.claim_item).setOnClickListener { openClaimDialog(item) }
-		findViewById<View>(R.id.suggest_found_item).setOnClickListener { openFoundSuggestionDialog(item) }
-		findViewById<View>(R.id.suggest_found_item).isVisible =
-			item.isFirestoreItem && type == TYPE_FOUND && item.status != ItemStatus.CLOSED
+		findViewById<TextView>(R.id.claim_item).apply {
+			setOnClickListener { openClaimDialog(item, type) }
+			setText(if (type == TYPE_FOUND) R.string.claim_request else R.string.found_request)
+		}
 		updateClaimButton(item, type)
-	}
-
-	private fun openFoundSuggestionDialog(foundItem: ItemDetails) {
-		val userId = SessionManager(this).userId
-		if (userId == null) {
-			startActivity(Intent(this, AuthActivity::class.java))
-			return
-		}
-		lifecycleScope.launch {
-			try {
-				val uid = firestoreSuggestionRepository.currentUserUid
-					?: run {
-						startActivity(Intent(this@ItemDetailsActivity, AuthActivity::class.java))
-						return@launch
-					}
-				val lostItems = firestoreRepository.observeItems().first()
-					.filter { item ->
-						item.type == FirestoreItemRepository.TYPE_LOST &&
-							item.status == FirestoreItemRepository.STATUS_OPEN &&
-							item.postedBy != uid
-					}
-				if (lostItems.isEmpty()) {
-					Toast.makeText(this@ItemDetailsActivity, R.string.no_lost_items_to_suggest, Toast.LENGTH_SHORT).show()
-					return@launch
-				}
-				MaterialAlertDialogBuilder(this@ItemDetailsActivity)
-					.setTitle(R.string.suggest_found_item_title)
-					.setItems(lostItems.map { "${it.itemName} — ${it.location}" }.toTypedArray()) { _, index ->
-						submitFoundSuggestion(foundItem.id, lostItems[index].itemId, userId)
-					}
-					.setNegativeButton(R.string.cancel, null)
-					.show()
-			} catch (e: CancellationException) {
-				throw e
-			} catch (e: Exception) {
-				Log.e(TAG, "Unable to load lost items for suggestion", e)
-				Toast.makeText(this@ItemDetailsActivity, R.string.suggestion_submit_failed, Toast.LENGTH_SHORT).show()
-			}
-		}
-	}
-
-	private fun submitFoundSuggestion(foundItemId: String, lostItemId: String, userId: Long) {
-		lifecycleScope.launch {
-			try {
-				val senderName = repository.getUser(userId)?.username.orEmpty()
-				val result = firestoreSuggestionRepository.submitFoundSuggestion(
-					foundItemId = foundItemId,
-					lostItemId = lostItemId,
-					senderName = senderName
-				)
-				val message = when (result) {
-					FoundSuggestionSubmissionResult.SUCCESS -> R.string.suggestion_submitted
-					FoundSuggestionSubmissionResult.UNAUTHENTICATED -> R.string.suggestion_auth_required
-					FoundSuggestionSubmissionResult.FOUND_ITEM_NOT_FOUND,
-					FoundSuggestionSubmissionResult.LOST_ITEM_NOT_FOUND -> R.string.item_not_found
-					FoundSuggestionSubmissionResult.OWNER_CANNOT_SUGGEST -> R.string.suggestion_owner_not_allowed
-					FoundSuggestionSubmissionResult.ITEM_NOT_AVAILABLE -> R.string.suggestion_item_unavailable
-					FoundSuggestionSubmissionResult.ALREADY_SUGGESTED -> R.string.suggestion_already_submitted
-					FoundSuggestionSubmissionResult.FAILED -> R.string.suggestion_submit_failed
-				}
-				Toast.makeText(this@ItemDetailsActivity, message, Toast.LENGTH_SHORT).show()
-			} catch (e: CancellationException) {
-				throw e
-			} catch (e: Exception) {
-				Log.e(TAG, "Unable to submit found-item suggestion", e)
-				Toast.makeText(this@ItemDetailsActivity, R.string.suggestion_submit_failed, Toast.LENGTH_SHORT).show()
-			}
-		}
 	}
 
 	private fun updateClaimButton(item: ItemDetails, type: String) {
 		val claimButton = findViewById<View>(R.id.claim_item)
 		val session = SessionManager(this)
 		val userId = session.userId
-		if (type != TYPE_FOUND || item.status == ItemStatus.CLOSED ||
+		if (!item.isFirestoreItem || type !in setOf(TYPE_FOUND, TYPE_LOST) ||
+			item.status == ItemStatus.CLOSED ||
 			(item.postedByUserId != null && item.postedByUserId == userId) ||
 			(item.postedByUid != null && item.postedByUid == firestoreRepository.currentUserUid)
 		) {
@@ -268,25 +196,20 @@ class ItemDetailsActivity : AppCompatActivity() {
 		}
 		lifecycleScope.launch {
 			try {
-				val alreadyClaimed = if (item.isFirestoreItem) {
-					firestoreClaimRepository.hasPendingClaim(item.id)
-				} else {
-					val roomItemId = item.roomItemId ?: return@launch
-					repository.hasClaim(userId, roomItemId)
-				}
-				claimButton.isVisible = !alreadyClaimed
-				claimButton.isEnabled = !alreadyClaimed
+				val alreadyRequested = firestoreClaimRepository.hasPendingClaim(item.id)
+				claimButton.isVisible = !alreadyRequested
+				claimButton.isEnabled = !alreadyRequested
 			} catch (e: CancellationException) {
 				throw e
 			} catch (e: Exception) {
-				Log.e(TAG, "Unable to check for an existing claim", e)
+				Log.e(TAG, "Unable to check for an existing request", e)
 				claimButton.isVisible = false
 				Toast.makeText(this@ItemDetailsActivity, R.string.claim_submit_failed, Toast.LENGTH_SHORT).show()
 			}
 		}
 	}
 
-	private fun openClaimDialog(item: ItemDetails) {
+	private fun openClaimDialog(item: ItemDetails, type: String) {
 		val userId = SessionManager(this).userId
 		if (userId == null) {
 			startActivity(Intent(this, AuthActivity::class.java))
@@ -296,7 +219,7 @@ class ItemDetailsActivity : AppCompatActivity() {
 		val inputLayout = dialogView.findViewById<TextInputLayout>(R.id.claim_description_layout)
 		val input = dialogView.findViewById<TextInputEditText>(R.id.claim_description)
 		val dialog = MaterialAlertDialogBuilder(this)
-			.setTitle(R.string.claim_item_title)
+			.setTitle(if (type == TYPE_FOUND) R.string.claim_request_title else R.string.found_request_title)
 			.setView(dialogView)
 			.setNegativeButton(R.string.cancel, null)
 			.setPositiveButton(R.string.submit_claim, null)
@@ -351,14 +274,13 @@ class ItemDetailsActivity : AppCompatActivity() {
 				Toast.makeText(this@ItemDetailsActivity, message, Toast.LENGTH_SHORT).show()
 				if (result == ClaimSubmissionResult.SUCCESS) {
 					dialog.dismiss()
-					findViewById<TextView>(R.id.item_details_status).setText(R.string.item_claimed)
 					findViewById<View>(R.id.claim_item).isEnabled = false
 					findViewById<View>(R.id.claim_item).visibility = View.GONE
 				}
 			} catch (e: CancellationException) {
 				throw e
 			} catch (e: Exception) {
-				Log.e(TAG, "Unable to submit claim", e)
+				Log.e(TAG, "Unable to submit request", e)
 				Toast.makeText(this@ItemDetailsActivity, R.string.claim_submit_failed, Toast.LENGTH_SHORT).show()
 			}
 		}
