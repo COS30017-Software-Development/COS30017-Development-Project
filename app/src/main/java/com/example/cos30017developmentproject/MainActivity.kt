@@ -21,14 +21,19 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
+import com.example.cos30017developmentproject.data.remote.FirestoreNotification
+import com.example.cos30017developmentproject.data.remote.FirestoreNotificationRepository
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.ui.home.ItemCardAdapter
 import com.example.cos30017developmentproject.ui.home.toItemCard
 import com.example.cos30017developmentproject.ui.items.ItemFilter
 import com.example.cos30017developmentproject.ui.items.ItemsPage
+import com.example.cos30017developmentproject.ui.notifications.NotificationsPage
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigation.NavigationView
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -36,8 +41,13 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var bottomNavigation: BottomNavigationView
 	private lateinit var sideNavigation: NavigationView
 	private lateinit var itemsPage: ItemsPage
+	private lateinit var notificationsPage: NotificationsPage
 	private lateinit var backCallback: OnBackPressedCallback
 	private lateinit var firestoreRepository: FirestoreItemRepository
+	private lateinit var notificationRepository: FirestoreNotificationRepository
+	private var unreadCountJob: Job? = null
+	private val firebaseAuth by lazy { FirebaseAuth.getInstance() }
+	private val authStateListener = FirebaseAuth.AuthStateListener { refreshUnreadCount() }
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -48,7 +58,14 @@ class MainActivity : AppCompatActivity() {
 		bottomNavigation.isItemActiveIndicatorEnabled = false
 		sideNavigation = findViewById(R.id.side_navigation)
 		firestoreRepository = FirestoreItemRepository()
+		notificationRepository = FirestoreNotificationRepository()
 		itemsPage = ItemsPage(findViewById(R.id.items_page), window, savedInstanceState, firestoreRepository, this)
+		notificationsPage = NotificationsPage(
+			findViewById(R.id.notifications_page),
+			notificationRepository,
+			this,
+			::openNotificationDetails
+		)
 		ViewCompat.setOnApplyWindowInsetsListener(drawer) { _, insets ->
 			val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
 			val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime())            // DrawerLayout lays out children without respecting its own padding.
@@ -162,6 +179,8 @@ class MainActivity : AppCompatActivity() {
 				openMyPosts()
 			} else if (item.itemId == R.id.drawer_my_claims) {
 				openMyClaims()
+			} else if (item.itemId == R.id.drawer_notifications) {
+				openNotifications()
 			} else if (item.itemId == R.id.drawer_profile) {
 				openProfile()
 			} else showPreviewMessage(item.title.toString())
@@ -170,18 +189,35 @@ class MainActivity : AppCompatActivity() {
 		bottomNavigation.selectedItemId = intent.getIntExtra(
 			EXTRA_SELECTED_NAVIGATION, savedInstanceState?.getInt("navigation.page") ?: R.id.nav_home
 		)
+		if (savedInstanceState?.getBoolean("navigation.notifications") == true) openNotifications()
 		drawer.closeDrawer(GravityCompat.START, false)
+	}
+
+	override fun onStart() {
+		super.onStart()
+		firebaseAuth.addAuthStateListener(authStateListener)
+		refreshUnreadCount()
+	}
+
+	override fun onStop() {
+		firebaseAuth.removeAuthStateListener(authStateListener)
+		unreadCountJob?.cancel()
+		unreadCountJob = null
+		super.onStop()
 	}
 
 	override fun onSaveInstanceState(outState: Bundle) {
 		itemsPage.saveState(outState)
 		outState.putInt("navigation.page", bottomNavigation.selectedItemId)
+		outState.putBoolean("navigation.notifications", findViewById<View>(R.id.notifications_page).isVisible)
 		super.onSaveInstanceState(outState)
 	}
 
 	private fun showPage(showItems: Boolean) {
 		findViewById<View>(R.id.home_scroll).isVisible = !showItems
 		findViewById<View>(R.id.items_page).isVisible = showItems
+		findViewById<View>(R.id.notifications_page).isVisible = false
+		notificationsPage.stopObserving()
 		sideNavigation.menu.findItem(R.id.drawer_home).isChecked = !showItems
 		if (!showItems) sideNavigation.setCheckedItem(R.id.drawer_home)
 		WindowCompat.getInsetsController(window, drawer).hide(WindowInsetsCompat.Type.ime())
@@ -196,7 +232,9 @@ class MainActivity : AppCompatActivity() {
 	}
 
 	private fun updateBackCallback() {
-		backCallback.isEnabled = drawer.isDrawerOpen(GravityCompat.START) || findViewById<View>(R.id.items_page).isVisible
+		backCallback.isEnabled = drawer.isDrawerOpen(GravityCompat.START) ||
+			findViewById<View>(R.id.items_page).isVisible ||
+			findViewById<View>(R.id.notifications_page).isVisible
 	}
 
 	private fun scrollHomeToTop() {
@@ -228,6 +266,55 @@ class MainActivity : AppCompatActivity() {
 		} else {
 			startActivity(Intent(this, MyClaimsActivity::class.java))
 		}
+	}
+
+	private fun openNotifications() {
+		if (SessionManager(this).userId == null) {
+			startActivity(Intent(this, AuthActivity::class.java))
+		} else {
+			findViewById<View>(R.id.home_scroll).isVisible = false
+			findViewById<View>(R.id.items_page).isVisible = false
+			findViewById<View>(R.id.notifications_page).isVisible = true
+			notificationsPage.startObserving()
+			sideNavigation.setCheckedItem(R.id.drawer_notifications)
+			updateBackCallback()
+		}
+	}
+
+	private fun openNotificationDetails(notification: FirestoreNotification) {
+		startActivity(Intent(this, ItemDetailsActivity::class.java).apply {
+			putExtra(ItemDetailsActivity.EXTRA_ITEM_ID, notification.itemId)
+			putExtra(
+				ItemDetailsActivity.EXTRA_ITEM_TYPE,
+				if (notification.itemType == FirestoreItemRepository.TYPE_FOUND) {
+					ItemDetailsActivity.TYPE_FOUND
+				} else {
+					ItemDetailsActivity.TYPE_LOST
+				}
+			)
+		})
+	}
+
+	private fun refreshUnreadCount() {
+		unreadCountJob?.cancel()
+		if (firebaseAuth.currentUser == null) {
+			updateUnreadBadge(0)
+			return
+		}
+		unreadCountJob = lifecycleScope.launch {
+			notificationRepository.observeUnreadCount()
+				.catch { error ->
+					Log.e(TAG, "Unable to load unread notification count", error)
+					emit(0)
+				}
+				.collect(::updateUnreadBadge)
+		}
+	}
+
+	private fun updateUnreadBadge(count: Int) {
+		val badge = sideNavigation.menu.findItem(R.id.drawer_notifications)
+			?.actionView?.findViewById<View>(R.id.notification_badge_dot)
+		badge?.isVisible = count > 0
 	}
 
 	private fun openProfile() {

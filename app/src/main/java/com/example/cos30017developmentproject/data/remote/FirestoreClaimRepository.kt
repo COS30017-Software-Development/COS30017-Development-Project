@@ -78,6 +78,7 @@ class FirestoreClaimRepository(
 
 		val itemReference = items.document(itemId)
 		val claimReference = claims.document(claimDocumentId(uid, itemId))
+		val notificationReference = firestore.collection(NOTIFICATIONS_COLLECTION).document()
 		return try {
 			firestore.runTransaction { transaction ->
 				val item = transaction.get(itemReference)
@@ -105,13 +106,16 @@ class FirestoreClaimRepository(
 					?: return@runTransaction ClaimSubmissionResult.ITEM_NOT_FOUND
 				val itemLocation = item.getString(FIELD_ITEM_LOCATION)
 					?: return@runTransaction ClaimSubmissionResult.ITEM_NOT_FOUND
+				val submittedAt = Timestamp.now()
+				val notificationSenderName = studentName.trim().take(MAX_NOTIFICATION_SENDER_NAME_LENGTH)
 				val claimData = mapOf(
 					FIELD_CLAIM_ID to claimReference.id,
+					FIELD_NOTIFICATION_ID to notificationReference.id,
 					FIELD_ITEM_ID to itemId,
 					FIELD_STUDENT_ID to uid,
 					FIELD_DESCRIPTION to validatedDescription,
 					FIELD_STATUS to ClaimStatus.PENDING,
-					FIELD_SUBMITTED_AT to Timestamp.now(),
+					FIELD_SUBMITTED_AT to submittedAt,
 					FIELD_ITEM_TITLE to itemTitle,
 					FIELD_CLAIM_ITEM_LOCATION to itemLocation,
 					FIELD_STUDENT_NAME to studentName,
@@ -124,6 +128,29 @@ class FirestoreClaimRepository(
 					mapOf(
 						FIELD_STATUS to ItemStatus.CLAIMED,
 						FIELD_PENDING_CLAIM_COUNT to pendingCount + 1
+					)
+				)
+				transaction.set(
+					notificationReference,
+					mapOf(
+						FIELD_NOTIFICATION_RECIPIENT_UID to item.getString(FIELD_POSTED_BY),
+						FIELD_NOTIFICATION_SENDER_UID to uid,
+						FIELD_NOTIFICATION_SENDER_NAME to notificationSenderName,
+						FIELD_NOTIFICATION_TYPE to FirestoreNotification.TYPE_CLAIM_REQUEST,
+						FIELD_NOTIFICATION_REQUEST_ID to claimReference.id,
+						FIELD_ITEM_ID to itemId,
+						FIELD_NOTIFICATION_ITEM_TYPE to FirestoreItemRepository.TYPE_FOUND,
+						FIELD_NOTIFICATION_ITEM_TITLE to itemTitle,
+						FIELD_NOTIFICATION_ITEM_LOCATION to itemLocation,
+						FIELD_NOTIFICATION_RELATED_ITEM_ID to null,
+						FIELD_NOTIFICATION_RELATED_ITEM_TYPE to null,
+						FIELD_NOTIFICATION_RELATED_ITEM_TITLE to null,
+						FIELD_NOTIFICATION_RELATED_ITEM_LOCATION to null,
+						FIELD_NOTIFICATION_TITLE to NOTIFICATION_TITLE,
+						FIELD_NOTIFICATION_MESSAGE to
+							"${notificationSenderName.ifBlank { "A student" }} submitted a claim for \"$itemTitle\".",
+						FIELD_NOTIFICATION_CREATED_AT to submittedAt,
+						FIELD_NOTIFICATION_IS_READ to false,
 					)
 				)
 				ClaimSubmissionResult.SUCCESS
@@ -283,6 +310,7 @@ class FirestoreClaimRepository(
 		const val ITEMS_COLLECTION = "items"
 		const val CLAIMS_COLLECTION = "claims"
 		const val FIELD_CLAIM_ID = "claimId"
+		const val FIELD_NOTIFICATION_ID = "notificationId"
 		const val FIELD_ITEM_ID = "itemId"
 		const val FIELD_STUDENT_ID = "studentId"
 		const val FIELD_DESCRIPTION = "description"
@@ -299,6 +327,25 @@ class FirestoreClaimRepository(
 		const val FIELD_ITEM_LOCATION = "location"
 		const val FIELD_PENDING_CLAIM_COUNT = "pendingClaimCount"
 		const val FIELD_LAST_REVIEWED_CLAIM_ID = "lastReviewedClaimId"
+		const val NOTIFICATIONS_COLLECTION = "notifications"
+		const val FIELD_NOTIFICATION_RECIPIENT_UID = "recipientUid"
+		const val FIELD_NOTIFICATION_SENDER_UID = "senderUid"
+		const val FIELD_NOTIFICATION_SENDER_NAME = "senderName"
+		const val FIELD_NOTIFICATION_TYPE = "type"
+		const val FIELD_NOTIFICATION_REQUEST_ID = "relatedRequestId"
+		const val FIELD_NOTIFICATION_ITEM_TYPE = "itemType"
+		const val FIELD_NOTIFICATION_ITEM_TITLE = "itemTitle"
+		const val FIELD_NOTIFICATION_ITEM_LOCATION = "itemLocation"
+		const val FIELD_NOTIFICATION_RELATED_ITEM_ID = "relatedItemId"
+		const val FIELD_NOTIFICATION_RELATED_ITEM_TYPE = "relatedItemType"
+		const val FIELD_NOTIFICATION_RELATED_ITEM_TITLE = "relatedItemTitle"
+		const val FIELD_NOTIFICATION_RELATED_ITEM_LOCATION = "relatedItemLocation"
+		const val FIELD_NOTIFICATION_TITLE = "title"
+		const val FIELD_NOTIFICATION_MESSAGE = "message"
+		const val FIELD_NOTIFICATION_CREATED_AT = "createdAt"
+		const val FIELD_NOTIFICATION_IS_READ = "isRead"
+		const val NOTIFICATION_TITLE = "New claim request"
+		const val MAX_NOTIFICATION_SENDER_NAME_LENGTH = 100
 	}
 
 }

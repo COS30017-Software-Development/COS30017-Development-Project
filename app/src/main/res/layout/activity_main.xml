@@ -79,6 +79,7 @@
 			</androidx.core.widget.NestedScrollView >
 
 			<include layout = "@layout/page_items" />
+			<include layout = "@layout/page_notifications" />
 		</FrameLayout >
 
 		<View

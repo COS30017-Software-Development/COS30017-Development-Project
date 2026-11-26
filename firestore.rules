@@ -84,6 +84,46 @@ service cloud.firestore {
         && data.studentNumber is string && data.studentNumber.size() <= 50;
     }
 
+    function validNotificationReferences(data) {
+      let item = get(itemPath(data.itemId)).data;
+      let claimPathValue = claimDocumentPath(data.claimId);
+      let claimAfter = getAfter(claimPathValue).data;
+      return signedIn()
+        && data.recipientUid is string
+        && data.senderUid == request.auth.uid
+        && data.itemType == 'FOUND'
+        && data.title == 'New claim request'
+        && data.message == 'Someone has submitted a claim for "' + item.itemName + '".'
+        && data.createdAt is timestamp
+        && data.isRead == false
+        && item.type == 'FOUND'
+        && item.postedBy == data.recipientUid
+        && item.postedBy != request.auth.uid
+        && existsAfter(claimPathValue)
+        && claimAfter.studentId == request.auth.uid
+        && claimAfter.itemId == data.itemId
+        && claimAfter.status == 'PENDING'
+        && claimAfter.submittedAt == data.createdAt
+        && (!exists(claimPathValue) || get(claimPathValue).data.status == 'REJECTED')
+        && getAfter(itemPath(data.itemId)).data.status == 'CLAIMED';
+    }
+
+    function validNotification(data) {
+      return signedIn()
+        && data.keys().hasAll([
+          'recipientUid', 'senderUid', 'itemId', 'itemType', 'title',
+          'message', 'createdAt', 'isRead', 'claimId'
+        ])
+        && data.keys().hasOnly([
+          'recipientUid', 'senderUid', 'itemId', 'itemType', 'title',
+          'message', 'createdAt', 'isRead', 'claimId'
+        ])
+        && data.itemId is string
+        && data.claimId is string
+        && exists(itemPath(data.itemId))
+        && validNotificationReferences(data);
+    }
+
     function validClaimantUpdate(itemId) {
       let claim = getAfter(claimPath(request.auth.uid, itemId)).data;
       let existingClaim = get(claimPath(request.auth.uid, itemId)).data;
@@ -233,6 +273,17 @@ service cloud.firestore {
         && pendingClaimCount(getAfter(itemPath(resource.data.itemId)).data)
           == pendingClaimCount(get(itemPath(resource.data.itemId)).data) + 1
       );
+      allow delete: if false;
+    }
+
+    match /notifications/{notificationId} {
+      allow get, list: if signedIn() && resource.data.recipientUid == request.auth.uid;
+      allow create: if validNotification(request.resource.data);
+      allow update: if signedIn()
+        && resource.data.recipientUid == request.auth.uid
+        && resource.data.isRead == false
+        && request.resource.data.isRead == true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
       allow delete: if false;
     }
   }
