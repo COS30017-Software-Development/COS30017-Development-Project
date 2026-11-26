@@ -118,7 +118,7 @@ class FirestoreClaimRepository(
 					FIELD_SUBMITTED_AT to submittedAt,
 					FIELD_ITEM_TITLE to itemTitle,
 					FIELD_CLAIM_ITEM_LOCATION to itemLocation,
-					FIELD_STUDENT_NAME to studentName,
+					FIELD_STUDENT_NAME to notificationSenderName,
 					FIELD_STUDENT_EMAIL to studentEmail,
 					FIELD_STUDENT_NUMBER to studentNumber
 				)

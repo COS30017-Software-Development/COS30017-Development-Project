@@ -26,6 +26,9 @@ class FirestoreSuggestionRepository(
 	private val suggestions = firestore.collection(SUGGESTIONS_COLLECTION)
 	private val notifications = firestore.collection(NOTIFICATIONS_COLLECTION)
 
+	val currentUserUid: String?
+		get() = firebaseAuth.currentUser?.uid
+
 	suspend fun submitFoundSuggestion(
 		foundItemId: String,
 		lostItemId: String,

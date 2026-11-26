@@ -25,6 +25,14 @@ service cloud.firestore {
       return /databases/$(database)/documents/claims/$(claimId);
     }
 
+    function foundSuggestionPath(suggestionId) {
+      return /databases/$(database)/documents/foundSuggestions/$(suggestionId);
+    }
+
+    function notificationPath(notificationId) {
+      return /databases/$(database)/documents/notifications/$(notificationId);
+    }
+
     function pendingClaimCount(data) {
       return data.get('pendingClaimCount', 0);
     }
@@ -66,10 +74,11 @@ service cloud.firestore {
           'itemTitle', 'itemLocation', 'studentName', 'studentEmail', 'studentNumber'
         ])
         && data.keys().hasOnly([
-          'claimId', 'itemId', 'studentId', 'description', 'status', 'submittedAt',
+          'claimId', 'notificationId', 'itemId', 'studentId', 'description', 'status', 'submittedAt',
           'itemTitle', 'itemLocation', 'studentName', 'studentEmail', 'studentNumber'
         ])
         && data.claimId == claimId
+        && (!data.keys().hasAny(['notificationId']) || data.notificationId is string)
         && data.itemId is string
         && data.studentId is string
         && claimId == data.studentId + '_' + data.itemId
@@ -84,44 +93,166 @@ service cloud.firestore {
         && data.studentNumber is string && data.studentNumber.size() <= 50;
     }
 
-    function validNotificationReferences(data) {
-      let item = get(itemPath(data.itemId)).data;
-      let claimPathValue = claimDocumentPath(data.claimId);
-      let claimAfter = getAfter(claimPathValue).data;
+    function validClaimNotificationLink(data, claimId) {
+      return data.notificationId is string
+        && existsAfter(notificationPath(data.notificationId))
+        && getAfter(notificationPath(data.notificationId)).data.type == 'CLAIM_REQUEST'
+        && getAfter(notificationPath(data.notificationId)).data.relatedRequestId == claimId
+        && getAfter(notificationPath(data.notificationId)).data.senderUid == request.auth.uid;
+    }
+
+    function validSuggestionNotificationLink(data, suggestionId) {
+      return data.notificationId is string
+        && existsAfter(notificationPath(data.notificationId))
+        && getAfter(notificationPath(data.notificationId)).data.type == 'FOUND_SUGGESTION'
+        && getAfter(notificationPath(data.notificationId)).data.relatedRequestId == suggestionId
+        && getAfter(notificationPath(data.notificationId)).data.senderUid == request.auth.uid;
+    }
+
+    function validFoundSuggestion(data, suggestionId) {
       return signedIn()
-        && data.recipientUid is string
+        && data.keys().hasAll([
+          'suggestionId', 'notificationId', 'senderUid', 'senderName', 'recipientUid',
+          'foundItemId', 'foundItemTitle', 'foundItemLocation',
+          'lostItemId', 'lostItemTitle', 'lostItemLocation', 'submittedAt'
+        ])
+        && data.keys().hasOnly([
+          'suggestionId', 'notificationId', 'senderUid', 'senderName', 'recipientUid',
+          'foundItemId', 'foundItemTitle', 'foundItemLocation',
+          'lostItemId', 'lostItemTitle', 'lostItemLocation', 'submittedAt'
+        ])
+        && data.suggestionId == suggestionId
         && data.senderUid == request.auth.uid
+        && data.senderName is string && data.senderName.size() <= 100
+        && data.recipientUid is string
+        && data.foundItemId is string
+        && data.lostItemId is string
+        && data.notificationId is string
+        && suggestionId == data.senderUid + '_' + data.foundItemId + '_' + data.lostItemId
+        && data.submittedAt is timestamp
+        && exists(itemPath(data.foundItemId))
+        && exists(itemPath(data.lostItemId))
+        && get(itemPath(data.foundItemId)).data.type == 'FOUND'
+        && get(itemPath(data.foundItemId)).data.status != 'CLOSED'
+        && get(itemPath(data.foundItemId)).data.itemName == data.foundItemTitle
+        && get(itemPath(data.foundItemId)).data.location == data.foundItemLocation
+        && get(itemPath(data.lostItemId)).data.type == 'LOST'
+        && get(itemPath(data.lostItemId)).data.status == 'OPEN'
+        && get(itemPath(data.lostItemId)).data.postedBy == data.recipientUid
+        && data.recipientUid != request.auth.uid
+        && get(itemPath(data.lostItemId)).data.itemName == data.lostItemTitle
+        && get(itemPath(data.lostItemId)).data.location == data.lostItemLocation
+        && validSuggestionNotificationLink(data, suggestionId);
+    }
+
+    function validClaimNotification(data, notificationId, item) {
+      let requestPath = claimDocumentPath(data.relatedRequestId);
+      let requestAfter = getAfter(requestPath).data;
+      return data.type == 'CLAIM_REQUEST'
         && data.itemType == 'FOUND'
+        && data.itemTitle == item.itemName
+        && data.itemLocation == item.location
+        && data.relatedItemId == null
+        && data.relatedItemType == null
+        && data.relatedItemTitle == null
+        && data.relatedItemLocation == null
+        && data.recipientUid == item.postedBy
+        && data.senderUid != item.postedBy
         && data.title == 'New claim request'
-        && data.message == 'Someone has submitted a claim for "' + item.itemName + '".'
-        && data.createdAt is timestamp
-        && data.isRead == false
-        && item.type == 'FOUND'
-        && item.postedBy == data.recipientUid
-        && item.postedBy != request.auth.uid
-        && existsAfter(claimPathValue)
-        && claimAfter.studentId == request.auth.uid
-        && claimAfter.itemId == data.itemId
-        && claimAfter.status == 'PENDING'
-        && claimAfter.submittedAt == data.createdAt
-        && (!exists(claimPathValue) || get(claimPathValue).data.status == 'REJECTED')
+        && data.message
+          == (data.senderName.size() > 0 ? data.senderName : 'A student')
+            + ' submitted a claim for "' + item.itemName + '".'
+        && existsAfter(requestPath)
+        && requestAfter.claimId == data.relatedRequestId
+        && requestAfter.notificationId == notificationId
+        && requestAfter.studentId == data.senderUid
+        && requestAfter.studentName == data.senderName
+        && requestAfter.itemId == data.itemId
+        && requestAfter.itemTitle == data.itemTitle
+        && requestAfter.itemLocation == data.itemLocation
+        && requestAfter.status == 'PENDING'
+        && requestAfter.submittedAt == data.createdAt
+        && (!exists(requestPath) || get(requestPath).data.status == 'REJECTED')
         && getAfter(itemPath(data.itemId)).data.status == 'CLAIMED';
     }
 
-    function validNotification(data) {
+    function validFoundSuggestionNotification(data, notificationId, item) {
+      let suggestionPath = foundSuggestionPath(data.relatedRequestId);
+      let suggestionAfter = getAfter(suggestionPath).data;
+      return data.type == 'FOUND_SUGGESTION'
+        && data.itemType == 'LOST'
+        && data.itemTitle == item.itemName
+        && data.itemLocation == item.location
+        && data.relatedItemId is string
+        && data.relatedItemType == 'FOUND'
+        && data.recipientUid == item.postedBy
+        && data.senderUid != item.postedBy
+        && exists(itemPath(data.relatedItemId))
+        && data.relatedItemTitle == get(itemPath(data.relatedItemId)).data.itemName
+        && data.relatedItemLocation == get(itemPath(data.relatedItemId)).data.location
+        && get(itemPath(data.relatedItemId)).data.type == 'FOUND'
+        && data.title == 'Found item suggestion'
+        && data.message
+          == (data.senderName.size() > 0 ? data.senderName : 'A student')
+            + ' suggested "' + data.relatedItemTitle + '" for "' + item.itemName + '".'
+        && existsAfter(suggestionPath)
+        && suggestionAfter.suggestionId == data.relatedRequestId
+        && suggestionAfter.notificationId == notificationId
+        && suggestionAfter.senderUid == data.senderUid
+        && suggestionAfter.senderName == data.senderName
+        && suggestionAfter.recipientUid == data.recipientUid
+        && suggestionAfter.lostItemId == data.itemId
+        && suggestionAfter.lostItemTitle == data.itemTitle
+        && suggestionAfter.lostItemLocation == data.itemLocation
+        && suggestionAfter.foundItemId == data.relatedItemId
+        && suggestionAfter.foundItemTitle == data.relatedItemTitle
+        && suggestionAfter.foundItemLocation == data.relatedItemLocation
+        && suggestionAfter.submittedAt == data.createdAt
+        && !exists(suggestionPath);
+    }
+
+    function validNotification(data, notificationId) {
       return signedIn()
         && data.keys().hasAll([
-          'recipientUid', 'senderUid', 'itemId', 'itemType', 'title',
-          'message', 'createdAt', 'isRead', 'claimId'
+          'recipientUid', 'senderUid', 'senderName', 'type', 'relatedRequestId',
+          'itemId', 'itemType', 'itemTitle', 'itemLocation',
+          'relatedItemId', 'relatedItemType', 'relatedItemTitle', 'relatedItemLocation',
+          'title', 'message', 'createdAt', 'isRead'
         ])
         && data.keys().hasOnly([
-          'recipientUid', 'senderUid', 'itemId', 'itemType', 'title',
-          'message', 'createdAt', 'isRead', 'claimId'
+          'recipientUid', 'senderUid', 'senderName', 'type', 'relatedRequestId',
+          'itemId', 'itemType', 'itemTitle', 'itemLocation',
+          'relatedItemId', 'relatedItemType', 'relatedItemTitle', 'relatedItemLocation',
+          'title', 'message', 'createdAt', 'isRead'
         ])
+        && data.recipientUid is string
+        && data.senderUid == request.auth.uid
+        && data.senderName is string && data.senderName.size() <= 100
+        && data.type in ['CLAIM_REQUEST', 'FOUND_SUGGESTION']
+        && data.relatedRequestId is string
         && data.itemId is string
-        && data.claimId is string
+        && data.itemType in ['FOUND', 'LOST']
+        && data.itemTitle is string && data.itemTitle.size() > 0 && data.itemTitle.size() <= 100
+        && data.itemLocation is string && data.itemLocation.size() > 0 && data.itemLocation.size() <= 100
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 100
+        && data.message is string && data.message.size() > 0 && data.message.size() <= 250
+        && data.createdAt is timestamp
+        && data.isRead == false
         && exists(itemPath(data.itemId))
-        && validNotificationReferences(data);
+        && (
+          (data.type == 'CLAIM_REQUEST'
+            && data.relatedItemId == null
+            && data.relatedItemType == null
+            && data.relatedItemTitle == null
+            && data.relatedItemLocation == null
+            && validClaimNotification(data, notificationId, get(itemPath(data.itemId)).data))
+          || (data.type == 'FOUND_SUGGESTION'
+            && data.relatedItemId is string
+            && data.relatedItemType == 'FOUND'
+            && data.relatedItemTitle is string
+            && data.relatedItemLocation is string
+            && validFoundSuggestionNotification(data, notificationId, get(itemPath(data.itemId)).data))
+        );
     }
 
     function validClaimantUpdate(itemId) {
@@ -216,6 +347,7 @@ service cloud.firestore {
         && (isAdmin() || resource.data.studentId == request.auth.uid);
       allow create: if signedIn()
         && validClaim(request.resource.data, claimId)
+        && validClaimNotificationLink(request.resource.data, claimId)
         && request.resource.data.studentId == request.auth.uid
         && request.resource.data.status == 'PENDING'
         && exists(itemPath(request.resource.data.itemId))
@@ -257,13 +389,14 @@ service cloud.firestore {
         && resource.data.status == 'REJECTED'
         && request.resource.data.status == 'PENDING'
         && validClaim(request.resource.data, claimId)
+        && validClaimNotificationLink(request.resource.data, claimId)
         && request.resource.data.studentId == resource.data.studentId
         && request.resource.data.itemId == resource.data.itemId
         && request.resource.data.claimId == resource.data.claimId
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly([
             'description', 'status', 'submittedAt', 'itemTitle', 'itemLocation',
-            'studentName', 'studentEmail', 'studentNumber'
+              'studentName', 'studentEmail', 'studentNumber', 'notificationId'
           ])
         && exists(itemPath(resource.data.itemId))
         && get(itemPath(resource.data.itemId)).data.status in ['OPEN', 'CLAIMED']
@@ -276,9 +409,27 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /foundSuggestions/{suggestionId} {
+      allow get: if signedIn()
+        && (
+          (!exists(foundSuggestionPath(suggestionId))
+            && suggestionId.matches('^' + request.auth.uid + '_.*$'))
+          || (exists(foundSuggestionPath(suggestionId))
+            && (
+              resource.data.senderUid == request.auth.uid
+              || resource.data.recipientUid == request.auth.uid
+            ))
+        );
+      allow list: if signedIn()
+        && (resource.data.senderUid == request.auth.uid
+          || resource.data.recipientUid == request.auth.uid);
+      allow create: if validFoundSuggestion(request.resource.data, suggestionId);
+      allow update, delete: if false;
+    }
+
     match /notifications/{notificationId} {
       allow get, list: if signedIn() && resource.data.recipientUid == request.auth.uid;
-      allow create: if validNotification(request.resource.data);
+      allow create: if validNotification(request.resource.data, notificationId);
       allow update: if signedIn()
         && resource.data.recipientUid == request.auth.uid
         && resource.data.isRead == false
