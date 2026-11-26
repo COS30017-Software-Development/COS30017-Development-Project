@@ -9,18 +9,6 @@
 			android:icon = "@drawable/ic_items"
 			android:title = "@string/items" />
 		<item
-			android:id = "@+id/drawer_lost"
-			android:icon = "@drawable/ic_lost"
-			android:title = "@string/lost" />
-		<item
-			android:id = "@+id/drawer_found"
-			android:icon = "@drawable/ic_found"
-			android:title = "@string/found" />
-		<item
-			android:id = "@+id/drawer_search"
-			android:icon = "@android:drawable/ic_menu_search"
-			android:title = "@string/search" />
-		<item
 			android:id = "@+id/drawer_post"
 			android:icon = "@drawable/ic_post"
 			android:title = "@string/post" />

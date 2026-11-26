@@ -105,7 +105,7 @@ class ProfileActivity : AppCompatActivity() {
 			when (item.itemId) {
 				R.id.drawer_profile -> true
 				R.id.drawer_home -> openMain(R.id.nav_home)
-				R.id.drawer_lost, R.id.drawer_found, R.id.drawer_search -> openMain(R.id.nav_items)
+				R.id.drawer_items -> openMain(R.id.nav_items)
 				R.id.drawer_post -> openPost()
 				R.id.drawer_my_posts -> startActivity(Intent(this, MyPostsActivity::class.java))
 				R.id.drawer_my_claims -> startActivity(Intent(this, MyClaimsActivity::class.java))
