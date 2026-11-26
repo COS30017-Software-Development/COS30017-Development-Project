@@ -23,6 +23,7 @@ import kotlinx.coroutines.tasks.await
 data class FirestoreClaim(
 	val claimId: String,
 	val itemId: String,
+	val itemType: String,
 	val studentId: String,
 	val description: String,
 	val status: String,
@@ -287,6 +288,8 @@ class FirestoreClaimRepository(
 				?: throw IllegalStateException("Firestore claim is missing its claimId"),
 			itemId = getString(FIELD_ITEM_ID)
 				?: throw IllegalStateException("Firestore claim is missing its itemId"),
+			// Claim creation and Firestore rules currently permit claims only for FOUND items.
+			itemType = FirestoreItemRepository.TYPE_FOUND,
 			studentId = getString(FIELD_STUDENT_ID)
 				?: throw IllegalStateException("Firestore claim is missing its studentId"),
 			description = getString(FIELD_DESCRIPTION)

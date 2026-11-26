@@ -182,7 +182,8 @@ Bring it home.</string >
 	<string name="claim_status_pending">Pending</string>
 	<string name="claim_status_approved">Approved</string>
 	<string name="claim_status_rejected">Rejected</string>
-	<string name="claim_submitted_label">Submitted</string>
+	<string name="claim_submitted_label">Request date</string>
+	<string name="claim_item_type_format">Item Type: %1$s</string>
 	<string name="item_closed">Closed</string>
 	<string name="filter_all">All</string>
 	<string name="admin_dashboard_title">Admin Dashboard</string>

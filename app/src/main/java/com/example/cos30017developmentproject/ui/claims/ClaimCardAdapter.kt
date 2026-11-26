@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.R
 import com.example.cos30017developmentproject.data.local.ClaimStatus
+import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -29,12 +30,20 @@ class ClaimCardAdapter(
 	class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
 		private val title = view.findViewById<TextView>(R.id.claim_card_title)
 		private val status = view.findViewById<TextView>(R.id.claim_card_status)
+		private val itemType = view.findViewById<TextView>(R.id.claim_card_item_type)
 		private val description = view.findViewById<TextView>(R.id.claim_card_description)
 		private val submitted = view.findViewById<TextView>(R.id.claim_card_submitted)
 
 		fun bind(card: ClaimCard, onClaimClick: (ClaimCard) -> Unit) {
 			title.text = card.title
 			description.text = card.description
+			val itemTypeName = itemView.context.getString(
+				when (card.itemType) {
+					FirestoreItemRepository.TYPE_LOST -> R.string.lost
+					else -> R.string.found
+				}
+			)
+			itemType.text = itemView.context.getString(R.string.claim_item_type_format, itemTypeName)
 			status.setText(
 				when (card.status) {
 					ClaimStatus.APPROVED -> R.string.claim_status_approved

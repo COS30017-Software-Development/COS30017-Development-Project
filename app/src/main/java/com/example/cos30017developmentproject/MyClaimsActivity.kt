@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.data.remote.FirestoreClaimRepository
+import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
 import com.example.cos30017developmentproject.ui.claims.ClaimCard
 import com.example.cos30017developmentproject.ui.claims.ClaimCardAdapter
 import com.google.android.material.appbar.MaterialToolbar
@@ -46,7 +47,14 @@ class MyClaimsActivity : AppCompatActivity() {
 		val adapter = ClaimCardAdapter { card ->
 			startActivity(Intent(this, ItemDetailsActivity::class.java).apply {
 				putExtra(ItemDetailsActivity.EXTRA_ITEM_ID, card.foundItemId.toString())
-				putExtra(ItemDetailsActivity.EXTRA_ITEM_TYPE, ItemDetailsActivity.TYPE_FOUND)
+				putExtra(
+					ItemDetailsActivity.EXTRA_ITEM_TYPE,
+					if (card.itemType == FirestoreItemRepository.TYPE_LOST) {
+						ItemDetailsActivity.TYPE_LOST
+					} else {
+						ItemDetailsActivity.TYPE_FOUND
+					}
+				)
 			})
 		}
 		findViewById<RecyclerView>(R.id.my_claims_list).apply {
@@ -64,6 +72,7 @@ class MyClaimsActivity : AppCompatActivity() {
 					val cards = claims.map { claim ->
 						ClaimCard(
 							foundItemId = claim.itemId,
+							itemType = claim.itemType,
 							title = claim.itemTitle,
 							description = claim.description,
 							status = claim.status,
