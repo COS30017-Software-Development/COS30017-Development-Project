@@ -14,6 +14,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.cos30017developmentproject.auth.SessionManager
 import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
+import com.example.cos30017developmentproject.ui.items.ItemTypeOption
+import com.example.cos30017developmentproject.ui.items.ItemTypeSelection
 import com.example.cos30017developmentproject.ui.items.ItemValidation
 import com.example.cos30017developmentproject.ui.items.ItemValidationError
 import com.google.android.material.button.MaterialButton
@@ -48,6 +50,15 @@ class AddItemActivity : AppCompatActivity() {
 
 	private fun saveItem() {
 		if (isSaving) return
+		val typeSelection = ItemTypeSelection.fromCheckedButton(
+			findViewById<RadioGroup>(R.id.add_item_type).checkedRadioButtonId,
+			R.id.add_item_type_lost,
+			R.id.add_item_type_found
+		)
+		if (typeSelection == null) {
+			Toast.makeText(this, R.string.item_type_required, Toast.LENGTH_SHORT).show()
+			return
+		}
 		val title = input(R.id.add_item_name)
 		val category = input(R.id.add_item_category)
 		val location = input(R.id.add_item_location)
@@ -63,8 +74,10 @@ class AddItemActivity : AppCompatActivity() {
 			finish()
 			return
 		}
-		val isLost = findViewById<RadioGroup>(R.id.add_item_type).checkedRadioButtonId == R.id.add_item_type_lost
-		val type = if (isLost) FirestoreItemRepository.TYPE_LOST else FirestoreItemRepository.TYPE_FOUND
+		val type = when (typeSelection) {
+			ItemTypeOption.LOST -> FirestoreItemRepository.TYPE_LOST
+			ItemTypeOption.FOUND -> FirestoreItemRepository.TYPE_FOUND
+		}
 		isSaving = true
 		findViewById<MaterialButton>(R.id.add_item_save).isEnabled = false
 		lifecycleScope.launch {

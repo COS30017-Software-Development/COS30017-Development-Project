@@ -142,6 +142,7 @@ Bring it home.</string >
 	<string name="post_item">Post item</string>
 	<string name="item_posted">Item posted.</string>
 	<string name="item_type_label">Item type</string>
+	<string name="item_type_required">Select Lost or Found before posting.</string>
 	<string name="my_posts">My Posts</string>
 	<string name="my_posts_title">My posts</string>
 	<string name="my_posts_empty">You have not posted any items.</string>
