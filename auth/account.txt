@@ -1,0 +1,11 @@
+[email]
+[password]
+
+user1@swinburne.edu.my
+user1#Swin111!
+
+user2@swinburne.edu.my
+user2#Swin222!
+
+admin@swinburne.edu.my
+admin#Swin999!

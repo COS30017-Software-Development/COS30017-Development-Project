@@ -20,7 +20,10 @@ class SessionManager(context: Context) {
 		}
 
 	val role: String
-		get() = UserRole.STUDENT
+		get() {
+			if (userId == null) return UserRole.STUDENT
+			return preferences.getString(KEY_ROLE, UserRole.STUDENT) ?: UserRole.STUDENT
+		}
 
 	fun login(user: UserEntity) {
 		val firebaseUid = requireNotNull(user.firebaseUid) {
@@ -29,7 +32,14 @@ class SessionManager(context: Context) {
 		preferences.edit {
 			putLong(KEY_USER_ID, user.id)
 			putString(KEY_FIREBASE_UID, firebaseUid)
-			remove(KEY_ROLE)
+			putString(KEY_ROLE, user.role)
+		}
+	}
+
+	fun updateRole(role: String) {
+		if (userId == null) return
+		preferences.edit {
+			putString(KEY_ROLE, role)
 		}
 	}
 

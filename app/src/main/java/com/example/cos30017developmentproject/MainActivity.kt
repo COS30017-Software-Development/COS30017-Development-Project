@@ -28,7 +28,11 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.cos30017developmentproject.data.remote.FirestoreItemRepository
 import com.example.cos30017developmentproject.data.remote.FirestoreNotification
 import com.example.cos30017developmentproject.data.remote.FirestoreNotificationRepository
+import com.example.cos30017developmentproject.auth.FirebaseAuthManager
 import com.example.cos30017developmentproject.auth.SessionManager
+import com.example.cos30017developmentproject.data.local.AppDatabase
+import com.example.cos30017developmentproject.data.local.LostAndFoundRepository
+import com.example.cos30017developmentproject.data.local.UserRole
 import com.example.cos30017developmentproject.ui.home.ItemCardAdapter
 import com.example.cos30017developmentproject.ui.home.toItemCard
 import com.example.cos30017developmentproject.ui.items.ItemFilter
@@ -51,8 +55,13 @@ class MainActivity : AppCompatActivity() {
 	private lateinit var firestoreRepository: FirestoreItemRepository
 	private lateinit var notificationRepository: FirestoreNotificationRepository
 	private var unreadCountJob: Job? = null
+	private var sessionCheckJob: Job? = null
+	private var checkedSessionUid: String? = null
 	private val firebaseAuth by lazy { FirebaseAuth.getInstance() }
-	private val authStateListener = FirebaseAuth.AuthStateListener { refreshUnreadCount() }
+	private val authStateListener = FirebaseAuth.AuthStateListener {
+		refreshUnreadCount()
+		restoreSessionAndRoute()
+	}
 	private val notificationPermissionLauncher =
 		registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
 			if (!granted) Toast.makeText(this, R.string.notification_permission_denied, Toast.LENGTH_LONG).show()
@@ -206,7 +215,36 @@ class MainActivity : AppCompatActivity() {
 		super.onStart()
 		firebaseAuth.addAuthStateListener(authStateListener)
 		refreshUnreadCount()
+		restoreSessionAndRoute()
 		requestNotificationPermissionIfNeeded()
+	}
+
+	private fun restoreSessionAndRoute() {
+		val currentUser = firebaseAuth.currentUser
+		if (currentUser == null) {
+			checkedSessionUid = null
+			return
+		}
+		if (checkedSessionUid == currentUser.uid) return
+		checkedSessionUid = currentUser.uid
+		sessionCheckJob?.cancel()
+		sessionCheckJob = lifecycleScope.launch {
+			val sessionManager = SessionManager(this@MainActivity)
+			val localRepository = LostAndFoundRepository(AppDatabase.getInstance(this@MainActivity))
+			if (sessionManager.userId == null) {
+				localRepository.getUserByFirebaseUid(currentUser.uid)?.let { user ->
+					sessionManager.login(user)
+				}
+			}
+			val isAdmin = FirebaseAuthManager(firebaseAuth).hasAdminRole(currentUser.uid)
+			if (isAdmin) {
+				sessionManager.updateRole(UserRole.ADMIN)
+				startActivity(Intent(this@MainActivity, AdminDashboardActivity::class.java))
+				finish()
+			} else {
+				sessionManager.updateRole(UserRole.STUDENT)
+			}
+		}
 	}
 
 	private fun requestNotificationPermissionIfNeeded() {
@@ -233,6 +271,8 @@ class MainActivity : AppCompatActivity() {
 		firebaseAuth.removeAuthStateListener(authStateListener)
 		unreadCountJob?.cancel()
 		unreadCountJob = null
+		sessionCheckJob?.cancel()
+		sessionCheckJob = null
 		super.onStop()
 	}
 
