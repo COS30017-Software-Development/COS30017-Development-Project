@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.StyleSpan
+import com.cloudinary.android.MediaManager
 import com.example.cos30017developmentproject.data.local.AppDatabase
 import com.example.cos30017developmentproject.data.remote.FirestoreNotification
 import com.example.cos30017developmentproject.data.remote.FirestoreNotificationRepository
@@ -48,6 +49,11 @@ class LostAndFoundApplication : Application() {
 
 	override fun onCreate() {
 		super.onCreate()
+		try {
+			MediaManager.get()
+		} catch (_: IllegalStateException) {
+			MediaManager.init(this, mapOf("cloud_name" to "x1rpt5a5"))
+		}
 		AppDatabase.getInstance(this).openHelper.writableDatabase
 		notificationRepository = FirestoreNotificationRepository()
 		registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {

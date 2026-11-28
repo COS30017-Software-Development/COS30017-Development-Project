@@ -1,20 +1,22 @@
 package com.example.cos30017developmentproject.data.remote
 
 import android.net.Uri
-import android.util.Log
-import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageReference
+import com.cloudinary.android.MediaManager
+import com.cloudinary.android.callback.ErrorInfo
+import com.cloudinary.android.callback.UploadCallback
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.Timestamp
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 data class FirestoreItem(
 	val itemId: String,
@@ -32,11 +34,10 @@ data class FirestoreItem(
 
 class FirestoreItemRepository(
 	firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
-	private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance(),
-	private val firebaseStorage: FirebaseStorage = FirebaseStorage.getInstance()
+	private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
 ) {
 	private val items: CollectionReference = firestore.collection(ITEMS_COLLECTION)
-	private val imageStorage = ItemImageStorage(firebaseStorage)
+	private val imageStorage = ItemImageStorage()
 
 	val currentUserUid: String?
 		get() = firebaseAuth.currentUser?.uid
@@ -81,7 +82,6 @@ class FirestoreItemRepository(
 		require(type == TYPE_LOST || type == TYPE_FOUND) { "Unsupported item type" }
 		val uid = currentUserUid ?: throw IllegalStateException("A Firebase user must be signed in to post an item")
 		val document = items.document()
-		var uploadedImage: UploadedItemImage? = null
 		try {
 			document.set(mapOf(
 				FIELD_ITEM_ID to document.id,
@@ -91,22 +91,15 @@ class FirestoreItemRepository(
 				FIELD_LOCATION to location,
 				FIELD_DATE to Timestamp.now(),
 				FIELD_TYPE to type,
-				FIELD_IMAGE_URL to null,
+				FIELD_IMAGE_URL to "",
 				FIELD_IMAGE_NAME to imageName,
 				FIELD_STATUS to STATUS_OPEN,
 				FIELD_PENDING_CLAIM_COUNT to 0,
 				FIELD_POSTED_BY to uid
 			)).await()
-			uploadedImage = imageUri?.let { imageStorage.upload(document.id, uid, it, imageContentType) }
-			if (uploadedImage != null) document.update(FIELD_IMAGE_URL, uploadedImage.downloadUrl).await()
+			val uploadedUrl = imageUri?.let { imageStorage.upload(it) }
+			if (uploadedUrl != null) document.update(FIELD_IMAGE_URL, uploadedUrl).await()
 		} catch (exception: Exception) {
-			uploadedImage?.reference?.let { reference ->
-				try {
-					reference.delete().await()
-				} catch (cleanupException: Exception) {
-					exception.addSuppressed(cleanupException)
-				}
-			}
 			try {
 				document.delete().await()
 			} catch (cleanupException: Exception) {
@@ -130,9 +123,9 @@ class FirestoreItemRepository(
 	): Exception? {
 		require(!(imageUri != null && removeImage)) { "An image cannot be uploaded and removed at the same time" }
 		val document = items.document(itemId)
-		val previousItem = getItem(itemId) ?: throw IllegalStateException("Item does not exist")
-		val uid = currentUserUid ?: throw IllegalStateException("A Firebase user must be signed in to edit an item")
-		val uploadedImage = imageUri?.let { imageStorage.upload(itemId, uid, it, imageContentType) }
+		getItem(itemId) ?: throw IllegalStateException("Item does not exist")
+		currentUserUid ?: throw IllegalStateException("A Firebase user must be signed in to edit an item")
+		val uploadedUrl = imageUri?.let { imageStorage.upload(it) }
 		val updates = mutableMapOf<String, Any?>(
 			FIELD_ITEM_NAME to itemName,
 			FIELD_DESCRIPTION to description,
@@ -140,31 +133,13 @@ class FirestoreItemRepository(
 			FIELD_LOCATION to location
 		)
 		imageName?.let { updates[FIELD_IMAGE_NAME] = it }
-		if (uploadedImage != null || removeImage) updates[FIELD_IMAGE_URL] = uploadedImage?.downloadUrl
-		try {
-			document.update(updates).await()
-		} catch (exception: Exception) {
-			uploadedImage?.reference?.let { reference ->
-				try {
-					reference.delete().await()
-				} catch (cleanupException: Exception) {
-					exception.addSuppressed(cleanupException)
-				}
-			}
-			throw exception
+		if (uploadedUrl != null) {
+			updates[FIELD_IMAGE_URL] = uploadedUrl
+		} else if (removeImage) {
+			updates[FIELD_IMAGE_URL] = ""
 		}
-		if (uploadedImage == null && !removeImage) return null
-		val previousUrl = previousItem.imageUrl ?: return null
-		if (previousUrl == uploadedImage?.downloadUrl) return null
-		return try {
-			imageStorage.delete(previousUrl, itemId)
-			null
-		} catch (exception: CancellationException) {
-			throw exception
-		} catch (exception: Exception) {
-			Log.e(TAG, "Item image was updated but the previous Storage object could not be removed", exception)
-			exception
-		}
+		document.update(updates).await()
+		return null
 	}
 
 	suspend fun closeItem(itemId: String) {
@@ -172,18 +147,8 @@ class FirestoreItemRepository(
 	}
 
 	suspend fun deleteItem(itemId: String): Exception? {
-		val imageUrl = getItem(itemId)?.imageUrl
 		items.document(itemId).delete().await()
-		if (imageUrl == null) return null
-		return try {
-			imageStorage.delete(imageUrl, itemId)
-			null
-		} catch (exception: CancellationException) {
-			throw exception
-		} catch (exception: Exception) {
-			Log.e(TAG, "Item was deleted but its Storage image could not be removed", exception)
-			exception
-		}
+		return null
 	}
 
 	private fun DocumentSnapshot.toFirestoreItem(): FirestoreItem? {
@@ -239,39 +204,48 @@ class FirestoreItemRepository(
 	}
 }
 
-private data class UploadedItemImage(
-	val reference: StorageReference,
-	val downloadUrl: String
-)
+private class ItemImageStorage {
+	suspend fun upload(uri: Uri): String = suspendCancellableCoroutine { continuation ->
+		val requestId = MediaManager.get().upload(uri)
+			.unsigned("COS30017_Development_Project")
+			.callback(object : UploadCallback {
+				override fun onStart(requestId: String?) = Unit
 
-private class ItemImageStorage(private val storage: FirebaseStorage) {
-	suspend fun upload(itemId: String, ownerUid: String, uri: Uri, contentType: String): UploadedItemImage {
-		val reference = storage.reference.child("items/$itemId/${java.util.UUID.randomUUID()}")
-		val metadata = com.google.firebase.storage.StorageMetadata.Builder()
-			.setContentType(contentType)
-			.setCustomMetadata("ownerUid", ownerUid)
-			.setCustomMetadata("itemId", itemId)
-			.build()
-		try {
-			reference.putFile(uri, metadata).await()
-			return UploadedItemImage(reference, reference.downloadUrl.await().toString())
-		} catch (exception: Exception) {
-			try {
-				reference.delete().await()
-			} catch (cleanupException: Exception) {
-				exception.addSuppressed(cleanupException)
-			}
-			throw exception
-		}
-	}
+				override fun onProgress(requestId: String?, bytes: Long, totalBytes: Long) = Unit
 
-	suspend fun delete(downloadUrl: String, itemId: String) {
-		val reference = try {
-			storage.getReferenceFromUrl(downloadUrl)
-		} catch (_: IllegalArgumentException) {
-			return
+				override fun onSuccess(requestId: String?, resultData: Map<*, *>?) {
+					val secureUrl = resultData?.get("secure_url")?.toString()
+					if (secureUrl.isNullOrBlank()) {
+						if (continuation.isActive) {
+							continuation.resumeWithException(
+								IllegalStateException("Cloudinary upload succeeded without a secure_url")
+							)
+						}
+					} else if (continuation.isActive) {
+						continuation.resume(secureUrl)
+					}
+				}
+
+				override fun onError(requestId: String?, error: ErrorInfo?) {
+					if (continuation.isActive) {
+						continuation.resumeWithException(
+							IllegalStateException(error?.description ?: "Image upload failed")
+						)
+					}
+				}
+
+				override fun onReschedule(requestId: String?, error: ErrorInfo?) {
+					if (continuation.isActive) {
+						continuation.resumeWithException(
+							IllegalStateException(error?.description ?: "Image upload rescheduled")
+						)
+					}
+				}
+			})
+			.dispatch()
+
+		continuation.invokeOnCancellation {
+			MediaManager.get().cancelRequest(requestId)
 		}
-		if (reference.bucket != storage.reference.bucket || !reference.path.startsWith("items/$itemId/")) return
-		reference.delete().await()
 	}
 }
