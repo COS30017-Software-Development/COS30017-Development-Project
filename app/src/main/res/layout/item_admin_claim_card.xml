@@ -5,9 +5,9 @@
 	android:layout_height="wrap_content"
 	android:layout_marginBottom="12dp"
 	app:cardBackgroundColor="@color/white"
-	app:cardCornerRadius="16dp"
+	app:cardCornerRadius="12dp"
 	app:cardElevation="0dp"
-	app:strokeColor="@color/outline_soft"
+	app:strokeColor="@color/admin_card_stroke"
 	app:strokeWidth="1dp">
 
 	<LinearLayout
@@ -19,6 +19,7 @@
 		<LinearLayout
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
+			android:gravity="center_vertical"
 			android:orientation="horizontal">
 
 			<TextView
@@ -26,6 +27,7 @@
 				style="@style/Campus.SectionTitle"
 				android:layout_width="0dp"
 				android:layout_height="wrap_content"
+				android:layout_marginEnd="8dp"
 				android:layout_weight="1"
 				android:textSize="18sp" />
 
@@ -33,9 +35,10 @@
 				android:id="@+id/admin_claim_status"
 				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"
-				android:background="@drawable/bg_badge"
+				android:background="@drawable/bg_status_pill"
+				android:fontFamily="sans-serif-medium"
 				android:paddingHorizontal="10dp"
-				android:paddingVertical="6dp"
+				android:paddingVertical="4dp"
 				android:textSize="12sp" />
 		</LinearLayout>
 
@@ -44,13 +47,23 @@
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:layout_marginTop="10dp"
-			android:textColor="@color/text_secondary" />
+			android:lineSpacingExtra="2dp"
+			android:textColor="@color/text_secondary"
+			android:textSize="13sp" />
+
+		<View
+			android:layout_width="match_parent"
+			android:layout_height="1dp"
+			android:layout_marginVertical="12dp"
+			android:background="@color/admin_card_stroke" />
 
 		<TextView
 			android:id="@+id/admin_claim_description"
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:layout_marginTop="8dp" />
+			android:lineSpacingExtra="3dp"
+			android:textColor="@color/black"
+			android:textSize="14sp" />
 
 		<TextView
 			android:id="@+id/admin_claim_date"
@@ -64,7 +77,7 @@
 			android:id="@+id/admin_claim_actions"
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
-			android:layout_marginTop="12dp"
+			android:layout_marginTop="14dp"
 			android:orientation="horizontal">
 
 			<com.google.android.material.button.MaterialButton
@@ -76,7 +89,11 @@
 				android:layout_weight="1"
 				android:text="@string/admin_claim_reject"
 				android:textAllCaps="false"
-				app:strokeColor="@color/brand_red_accessible" />
+				android:textColor="@color/admin_red"
+				app:backgroundTint="@color/white"
+				app:cornerRadius="12dp"
+				app:strokeColor="@color/admin_red"
+				app:strokeWidth="1dp" />
 
 			<com.google.android.material.button.MaterialButton
 				android:id="@+id/admin_claim_approve"
@@ -86,7 +103,8 @@
 				android:layout_weight="1"
 				android:text="@string/admin_claim_approve"
 				android:textAllCaps="false"
-				app:backgroundTint="@color/brand_red_accessible"
+				android:textColor="@color/white"
+				app:backgroundTint="@color/admin_black"
 				app:cornerRadius="12dp" />
 		</LinearLayout>
 	</LinearLayout>

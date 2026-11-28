@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.navigation.NavigationView xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
+	android:id="@+id/admin_side_navigation"
+	android:layout_width="280dp"
+	android:layout_height="match_parent"
+	android:layout_gravity="start"
+	android:background="@color/white"
+	android:fitsSystemWindows="false"
+	app:headerLayout="@layout/component_admin_drawer_header"
+	app:itemBackground="@drawable/bg_navigation_item"
+	app:itemIconPadding="24dp"
+	app:itemIconTint="@color/admin_navigation_colors"
+	app:itemTextColor="@color/admin_navigation_colors"
+	app:menu="@menu/admin_drawer_navigation" />

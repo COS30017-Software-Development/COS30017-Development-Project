@@ -10,4 +10,15 @@
 	<color name="crop_dim_light">#33000000</color>
 	<color name="avatar_viewer_scrim">#D9000000</color>
 	<color name = "password_requirement_met" >#00838F</color >
+	<color name = "admin_black" >#111111</color >
+	<color name = "admin_red" >#D32F2F</color >
+	<color name = "admin_subtitle_gray" >#B0B0B0</color >
+	<color name = "admin_chip_unselected" >#F2F2F2</color >
+	<color name = "admin_chip_text_unselected" >#222222</color >
+	<color name = "admin_card_stroke" >#EEEEEE</color >
+	<color name = "admin_drawer_inactive" >#424242</color >
+	<color name = "status_pending_bg" >#FFF8E1</color >
+	<color name = "status_pending_text" >#A15C00</color >
+	<color name = "status_approved_bg" >#E8F5E9</color >
+	<color name = "status_approved_text" >#2E7D32</color >
 </resources >

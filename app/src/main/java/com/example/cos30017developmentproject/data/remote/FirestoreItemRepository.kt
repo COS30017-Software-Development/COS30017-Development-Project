@@ -167,6 +167,10 @@ class FirestoreItemRepository(
 		}
 	}
 
+	suspend fun closeItem(itemId: String) {
+		items.document(itemId).update(FIELD_STATUS, STATUS_CLOSED).await()
+	}
+
 	suspend fun deleteItem(itemId: String): Exception? {
 		val imageUrl = getItem(itemId)?.imageUrl
 		items.document(itemId).delete().await()
@@ -215,6 +219,7 @@ class FirestoreItemRepository(
 		const val TYPE_FOUND = "FOUND"
 		const val STATUS_OPEN = "OPEN"
 		const val STATUS_PENDING_RETURN = "PENDING_RETURN"
+		const val STATUS_CLOSED = "CLOSED"
 		private const val ITEMS_COLLECTION = "items"
 		private const val FIELD_ITEM_ID = "itemId"
 		private const val FIELD_ITEM_NAME = "itemName"

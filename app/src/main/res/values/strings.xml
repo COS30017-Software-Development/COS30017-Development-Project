@@ -216,4 +216,19 @@ Bring it home.</string >
 	<string name="claim_review_already_processed">This request was already processed.</string>
 	<string name="claim_review_failed">Unable to update this request.</string>
 	<string name="claim_review_item_closed">This item is no longer available.</string>
+	<string name="admin_portal_title">ADMIN PORTAL</string>
+	<string name="admin_portal_subtitle">CAMPUS LOST &amp; FOUND</string>
+	<string name="admin_drawer_title">Admin Portal</string>
+	<string name="admin_drawer_subtitle">ADMIN SPACE</string>
+	<string name="admin_drawer_all_posts">All Posts</string>
+	<string name="admin_search_hint">Search posts by title or user...</string>
+	<string name="admin_tab_posts">Posts</string>
+	<string name="admin_tab_requests">Requests</string>
+	<string name="admin_mark_closed">Mark as Closed</string>
+	<string name="admin_delete_post">Delete Post</string>
+	<string name="admin_close_item_title">Mark post as closed?</string>
+	<string name="admin_close_item_message">This will close the post so no new requests can be submitted.</string>
+	<string name="admin_item_closed_success">Post marked as closed.</string>
+	<string name="admin_close_failed">Unable to close this post.</string>
+	<string name="admin_filter_approved">Approved</string>
 </resources >

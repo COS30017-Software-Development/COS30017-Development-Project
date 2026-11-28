@@ -1,9 +1,12 @@
 package com.example.cos30017developmentproject.ui.claims
 
+import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -36,18 +39,35 @@ class AdminClaimCardAdapter(
 		private val actions = view.findViewById<View>(R.id.admin_claim_actions)
 
 		fun bind(card: AdminClaimCard, onApprove: (AdminClaimCard) -> Unit, onReject: (AdminClaimCard) -> Unit) {
+			val context = itemView.context
 			title.text = card.itemTitle
-			status.setText(
-				when (card.status) {
-					ClaimStatus.APPROVED -> R.string.claim_status_approved
-					ClaimStatus.REJECTED -> R.string.claim_status_rejected
-					else -> R.string.claim_status_pending
-				}
+			val (statusTextRes, statusBgRes, statusTextColorRes) = when (card.status) {
+				ClaimStatus.APPROVED -> Triple(
+					R.string.claim_status_approved,
+					R.color.status_approved_bg,
+					R.color.status_approved_text
+				)
+				ClaimStatus.REJECTED -> Triple(
+					R.string.claim_status_rejected,
+					R.color.red_soft,
+					R.color.admin_red
+				)
+				else -> Triple(
+					R.string.claim_status_pending,
+					R.color.status_pending_bg,
+					R.color.status_pending_text
+				)
+			}
+			status.setText(statusTextRes)
+			status.setTextColor(ContextCompat.getColor(context, statusTextColorRes))
+			ViewCompat.setBackgroundTintList(
+				status,
+				ColorStateList.valueOf(ContextCompat.getColor(context, statusBgRes))
 			)
 			applicant.text = "${card.applicantName} • ${card.applicantStudentId}\n${card.applicantEmail}\n${card.itemLocation}"
 			description.text = card.description
 			val submitted = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(card.submittedAt))
-			date.text = itemView.context.getString(R.string.admin_claim_submitted) + ": " + submitted
+			date.text = context.getString(R.string.admin_claim_submitted) + ": " + submitted
 			actions.visibility = if (card.status == ClaimStatus.PENDING) View.VISIBLE else View.GONE
 			val approve = itemView.findViewById<View>(R.id.admin_claim_approve)
 			approve.visibility = if (card.canApprove) View.VISIBLE else View.GONE
