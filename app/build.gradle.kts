@@ -68,4 +68,7 @@ dependencies {
 
 	// Add the dependencies for any other desired Firebase products
 	// https://firebase.google.com/docs/android/setup#available-libraries
+
+	// Add Cloudinary Android SDKs
+	implementation("com.cloudinary:cloudinary-android:3.0.2")
 }
