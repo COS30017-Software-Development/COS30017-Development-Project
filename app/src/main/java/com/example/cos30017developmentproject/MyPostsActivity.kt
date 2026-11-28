@@ -105,18 +105,13 @@ class MyPostsActivity : AppCompatActivity() {
 
 	private fun bindFilterButton(id: Int, selected: Boolean) {
 		val button = findViewById<MaterialButton>(id)
-		button.backgroundTintList = ContextCompat.getColorStateList(
-			this,
-			if (selected) R.color.brand_red_accessible else R.color.white
-		)
-		button.setTextColor(
-			ContextCompat.getColor(this, if (selected) R.color.white else R.color.brand_red_accessible)
-		)
-		button.strokeColor = ContextCompat.getColorStateList(
-			this,
-			if (selected) R.color.brand_red_accessible else R.color.brand_red_accessible
-		)
-		button.strokeWidth = (1 * resources.displayMetrics.density).toInt()
+		button.isChecked = selected
+		button.backgroundTintList = ContextCompat.getColorStateList(this, R.color.white)
+		val strokeColor = if (selected) android.graphics.Color.parseColor("#D32F2F") else android.graphics.Color.parseColor("#E0E0E0")
+		val textColor = if (selected) android.graphics.Color.parseColor("#D32F2F") else android.graphics.Color.parseColor("#757575")
+		button.setTextColor(textColor)
+		button.strokeColor = android.content.res.ColorStateList.valueOf(strokeColor)
+		button.strokeWidth = (1 * resources.displayMetrics.density).toInt().coerceAtLeast(1)
 	}
 
 	private fun openItemDetails(item: ItemCard) {
