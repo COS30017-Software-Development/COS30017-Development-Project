@@ -126,6 +126,10 @@ class AdminDashboardActivity : AppCompatActivity() {
 					showTab(showPosts = false)
 					true
 				}
+				R.id.admin_nav_profile -> {
+					startActivity(Intent(this, ProfileActivity::class.java))
+					false
+				}
 				else -> false
 			}
 		}

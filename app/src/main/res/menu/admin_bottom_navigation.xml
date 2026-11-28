@@ -7,4 +7,8 @@
 		android:id="@+id/admin_nav_requests"
 		android:icon="@drawable/ic_notifications"
 		android:title="@string/admin_tab_requests" />
+	<item
+		android:id="@+id/admin_nav_profile"
+		android:icon="@drawable/ic_profile"
+		android:title="@string/profile" />
 </menu>

@@ -18,84 +18,89 @@
 		app:title="@string/my_requests_title"
 		app:titleTextColor="@color/black" />
 
-	<LinearLayout
+	<com.google.android.material.button.MaterialButtonToggleGroup
+		android:id="@+id/my_requests_direction_group"
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
 		android:background="@color/white"
-		android:orientation="horizontal"
 		android:paddingHorizontal="16dp"
-		android:paddingBottom="8dp">
+		android:paddingBottom="8dp"
+		app:selectionRequired="true"
+		app:singleSelection="true">
 
 		<com.google.android.material.button.MaterialButton
 			android:id="@+id/my_requests_sent"
+			style="@style/Widget.MaterialComponents.Button.OutlinedButton"
 			android:layout_width="0dp"
 			android:layout_height="wrap_content"
 			android:layout_weight="1"
+			android:checked="true"
+			android:ellipsize="end"
+			android:maxLines="1"
+			android:minHeight="48dp"
 			android:text="@string/requests_sent"
-			android:textAllCaps="false"
-			android:textColor="@color/white"
-			app:backgroundTint="@color/brand_red_accessible"
-			app:cornerRadius="12dp" />
+			android:textAllCaps="false" />
 
 		<com.google.android.material.button.MaterialButton
 			android:id="@+id/my_requests_received"
 			style="@style/Widget.MaterialComponents.Button.OutlinedButton"
 			android:layout_width="0dp"
 			android:layout_height="wrap_content"
-			android:layout_marginStart="8dp"
 			android:layout_weight="1"
+			android:ellipsize="end"
+			android:maxLines="1"
+			android:minHeight="48dp"
 			android:text="@string/requests_received"
-			android:textAllCaps="false"
-			android:textColor="@color/brand_red_accessible"
-			app:cornerRadius="12dp"
-			app:strokeColor="@color/brand_red_accessible" />
-	</LinearLayout>
+			android:textAllCaps="false" />
+	</com.google.android.material.button.MaterialButtonToggleGroup>
 
-	<LinearLayout
+	<com.google.android.material.button.MaterialButtonToggleGroup
+		android:id="@+id/my_requests_filter_group"
 		android:layout_width="match_parent"
 		android:layout_height="wrap_content"
 		android:background="@color/white"
-		android:orientation="horizontal"
 		android:paddingHorizontal="16dp"
-		android:paddingBottom="12dp">
+		android:paddingBottom="12dp"
+		app:selectionRequired="true"
+		app:singleSelection="true">
 
 		<com.google.android.material.button.MaterialButton
 			android:id="@+id/my_requests_filter_all"
+			style="@style/Widget.MaterialComponents.Button.OutlinedButton"
 			android:layout_width="0dp"
 			android:layout_height="wrap_content"
 			android:layout_weight="1"
+			android:checked="true"
+			android:ellipsize="end"
+			android:maxLines="1"
+			android:minHeight="48dp"
 			android:text="@string/filter_all"
-			android:textAllCaps="false"
-			android:textColor="@color/white"
-			app:backgroundTint="@color/brand_red_accessible"
-			app:cornerRadius="12dp" />
+			android:textAllCaps="false" />
 
 		<com.google.android.material.button.MaterialButton
 			android:id="@+id/my_requests_filter_claim"
 			style="@style/Widget.MaterialComponents.Button.OutlinedButton"
 			android:layout_width="0dp"
 			android:layout_height="wrap_content"
-			android:layout_marginStart="8dp"
 			android:layout_weight="1"
+			android:ellipsize="end"
+			android:maxLines="1"
+			android:minHeight="48dp"
 			android:text="@string/claim_request"
-			android:textAllCaps="false"
-			android:textColor="@color/brand_red_accessible"
-			app:cornerRadius="12dp"
-			app:strokeColor="@color/brand_red_accessible" />
+			android:textAllCaps="false" />
 
 		<com.google.android.material.button.MaterialButton
 			android:id="@+id/my_requests_filter_found"
 			style="@style/Widget.MaterialComponents.Button.OutlinedButton"
 			android:layout_width="0dp"
 			android:layout_height="wrap_content"
-			android:layout_marginStart="8dp"
 			android:layout_weight="1"
+			android:ellipsize="end"
+			android:maxLines="1"
+			android:minHeight="48dp"
 			android:text="@string/found_request"
-			android:textAllCaps="false"
-			android:textColor="@color/brand_red_accessible"
-			app:cornerRadius="12dp"
-			app:strokeColor="@color/brand_red_accessible" />
-	</LinearLayout>
+			android:textAllCaps="false" />
+	</com.google.android.material.button.MaterialButtonToggleGroup>
 
 	<FrameLayout
 		android:layout_width="match_parent"

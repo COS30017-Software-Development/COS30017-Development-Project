@@ -102,6 +102,10 @@ class AdminClaimReviewActivity : AppCompatActivity() {
 					false
 				}
 				R.id.admin_nav_requests -> true
+				R.id.admin_nav_profile -> {
+					startActivity(Intent(this, ProfileActivity::class.java))
+					false
+				}
 				else -> false
 			}
 		}
